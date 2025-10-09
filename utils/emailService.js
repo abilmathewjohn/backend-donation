@@ -18,6 +18,8 @@ const sendTicketEmail = async (donation, ticketNumbers) => {
       return false;
     }
 
+    console.log('🔧 Creating email transporter...');
+    
     // Create transporter with better configuration
     const transporter = nodemailer.createTransport({
       host: process.env.EMAIL_HOST || 'smtp.gmail.com',
@@ -34,6 +36,7 @@ const sendTicketEmail = async (donation, ticketNumbers) => {
 
     // Verify transporter configuration
     try {
+      console.log('🔍 Verifying SMTP connection...');
       await transporter.verify();
       console.log('✅ SMTP connection verified');
     } catch (verifyError) {
@@ -71,7 +74,6 @@ const sendTicketEmail = async (donation, ticketNumbers) => {
           <p>If you have any questions, please contact us.</p>
         </div>
       `,
-      // Add text version as fallback
       text: `
         Thank You for Your Donation!
         
@@ -92,6 +94,7 @@ const sendTicketEmail = async (donation, ticketNumbers) => {
       `
     };
 
+    console.log('📤 Sending email...');
     const info = await transporter.sendMail(mailOptions);
     console.log('✅ Actual email sent successfully:', info.messageId);
     console.log('📧 Email response:', info.response);
