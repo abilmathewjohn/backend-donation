@@ -1,8 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const { Donation, PaymentLink, AdminSettings } = require('../models');
-const { sendTicketEmail, deleteImage } = require('../utils/cloudinary');
+const { deleteImage } = require('../utils/cloudinary');
 const { Op } = require('sequelize');
+const { sendTicketEmail } = require('../utils/emailService'); // Adjust path as needed
 
 // Get all donations with pagination and filters
 router.get('/donations', async (req, res) => {
@@ -44,33 +45,52 @@ router.get('/donations', async (req, res) => {
 // Update donation status
 router.patch('/donations/:id/status', async (req, res) => {
   try {
+    console.log('🔔 PATCH /admin/donations/:id/status called');
+    console.log('📦 Request params:', req.params);
+    console.log('📦 Request body:', req.body);
+    
     const { status, actualAmount, ticketsToAssign, ticketNumbers } = req.body;
-    const donation = await Donation.findByPk(req.params.id);
+    const donationId = req.params.id;
+    
+    console.log('🔍 Looking for donation with ID:', donationId);
+    const donation = await Donation.findByPk(donationId);
     
     if (!donation) {
+      console.log('❌ Donation not found for ID:', donationId);
       return res.status(404).json({ error: 'Donation not found' });
     }
 
-    console.log('Updating donation:', req.body);
+    console.log('✅ Donation found:', donation.id);
+    console.log('🔄 Updating donation with data:', { status, actualAmount, ticketsToAssign, ticketNumbers });
 
     const updateData = { status };
     const settings = await AdminSettings.findOne();
     const ticketPrice = settings?.ticketPrice || 2.00;
+    
+    console.log('🎫 Ticket price from settings:', ticketPrice);
 
     if (status === 'confirmed') {
+      console.log('✅ Status is confirmed, processing ticket assignment...');
+      
       // Handle actual amount
       if (actualAmount !== undefined && actualAmount !== null && actualAmount !== '') {
         updateData.actualAmount = parseFloat(actualAmount);
+        console.log('💰 Using provided actual amount:', updateData.actualAmount);
       } else if (!donation.actualAmount) {
         updateData.actualAmount = parseFloat(donation.amount);
+        console.log('💰 Using donation amount as actual amount:', updateData.actualAmount);
+      } else {
+        console.log('💰 Keeping existing actual amount:', donation.actualAmount);
       }
       
       // Handle tickets assignment
       let finalTicketsAssigned;
       if (ticketsToAssign !== undefined && ticketsToAssign !== null && ticketsToAssign !== '') {
         finalTicketsAssigned = parseInt(ticketsToAssign);
+        console.log('🎫 Using provided tickets to assign:', finalTicketsAssigned);
       } else {
         finalTicketsAssigned = Math.floor(updateData.actualAmount / ticketPrice);
+        console.log('🎫 Auto-calculated tickets:', finalTicketsAssigned, 'from amount', updateData.actualAmount);
       }
       updateData.ticketsAssigned = finalTicketsAssigned;
       
@@ -78,40 +98,66 @@ router.patch('/donations/:id/status', async (req, res) => {
       let finalTicketNumbers = [];
       if (ticketNumbers && ticketNumbers.trim()) {
         finalTicketNumbers = ticketNumbers.split(',').map(t => t.trim()).filter(t => t);
+        console.log('🔢 Using provided ticket numbers:', finalTicketNumbers);
       } else {
         // Auto-generate ticket numbers
         for (let i = 1; i <= finalTicketsAssigned; i++) {
           finalTicketNumbers.push(`TICKET-${donation.id.slice(-8).toUpperCase()}-${i}`);
         }
+        console.log('🔢 Auto-generated ticket numbers:', finalTicketNumbers);
       }
       updateData.ticketNumbers = finalTicketNumbers;
       
     } else {
+      console.log('❌ Status is not confirmed, clearing assignment data');
       // Clear assignment data for non-confirmed status
       updateData.actualAmount = null;
       updateData.ticketsAssigned = null;
       updateData.ticketNumbers = null;
     }
 
+    console.log('💾 Saving update to database...');
     await donation.update(updateData);
+    console.log('✅ Database update successful');
 
     // Send email if confirmed and has tickets
     if (status === 'confirmed' && updateData.ticketNumbers && updateData.ticketNumbers.length > 0) {
+      console.log('📧 Attempting to send ticket email...');
+      console.log('📨 Recipient email:', donation.email);
+      console.log('🎫 Tickets to include:', updateData.ticketNumbers);
+      
       try {
-        await sendTicketEmail(donation, updateData.ticketNumbers);
-        console.log('Ticket email sent successfully');
+        const emailResult = await sendTicketEmail(donation, updateData.ticketNumbers);
+        console.log('✅ Email function result:', emailResult);
+        
+        if (emailResult) {
+          console.log('🎉 Ticket email sent successfully!');
+        } else {
+          console.log('❌ Email function returned false');
+        }
       } catch (emailError) {
-        console.error('Error sending ticket email:', emailError);
+        console.error('💥 Error sending ticket email:', emailError);
+        console.error('Email error stack:', emailError.stack);
       }
+    } else {
+      console.log('📧 Email not sent because:', {
+        status,
+        hasTicketNumbers: !!(updateData.ticketNumbers && updateData.ticketNumbers.length > 0),
+        ticketNumbersLength: updateData.ticketNumbers ? updateData.ticketNumbers.length : 0
+      });
     }
 
     const updatedDonation = await Donation.findByPk(req.params.id);
+    console.log('✅ Final updated donation:', updatedDonation.toJSON());
+    
     res.json({
       message: 'Donation status updated successfully',
       donation: updatedDonation
     });
+    
   } catch (error) {
-    console.error('Error updating donation status:', error);
+    console.error('💥 Error updating donation status:', error);
+    console.error('Error stack:', error.stack);
     res.status(500).json({ 
       error: 'Failed to update donation status',
       details: error.message 
