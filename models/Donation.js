@@ -7,12 +7,44 @@ module.exports = (sequelize) => {
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
     },
-    fullName: {
+    // Organization details
+    organizationName: {
       type: DataTypes.STRING,
+      defaultValue: 'Our Organization',
+    },
+    organizationLogo: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    bannerImage: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    
+    // Personal Information
+    fullName: {
+      type: DataTypes.STRING(25),
       allowNull: false,
       validate: {
-        notEmpty: true
+        notEmpty: true,
+        len: [1, 25]
       }
+    },
+    teammateName: {
+      type: DataTypes.STRING(25),
+      allowNull: true,
+    },
+    address: {
+      type: DataTypes.TEXT,
+      allowNull: false,
+    },
+    contactNumber1: {
+      type: DataTypes.STRING(11),
+      allowNull: false,
+    },
+    contactNumber2: {
+      type: DataTypes.STRING(11),
+      allowNull: true,
     },
     email: {
       type: DataTypes.STRING,
@@ -22,20 +54,34 @@ module.exports = (sequelize) => {
         notEmpty: true
       }
     },
-    phone: {
+    whatsappNumber: {
+      type: DataTypes.STRING(11),
+      allowNull: false,
+    },
+    zone: {
+      type: DataTypes.STRING(15),
+      allowNull: false,
+    },
+    
+    // Program Information
+    howDidYouKnow: {
       type: DataTypes.STRING,
       allowNull: false,
-      validate: {
-        notEmpty: true
-      }
     },
-    location: {
+    howDidYouKnowOther: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    dioceseInKerala: {
       type: DataTypes.STRING,
       allowNull: false,
-      validate: {
-        notEmpty: true
-      }
     },
+    previouslyParticipated: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+    },
+    
+    // Donation Information
     tickets: {
       type: DataTypes.INTEGER,
       allowNull: false,
@@ -57,11 +103,11 @@ module.exports = (sequelize) => {
       allowNull: true,
     },
     paymentScreenshot: {
-      type: DataTypes.STRING, // Cloudinary URL
+      type: DataTypes.STRING,
       allowNull: false,
     },
     paymentScreenshotPublicId: {
-      type: DataTypes.STRING, // Cloudinary public_id for deletion
+      type: DataTypes.STRING,
       allowNull: true,
     },
     paymentLinkUsed: {
