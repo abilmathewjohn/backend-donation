@@ -9,9 +9,10 @@ const { storage } = require('../utils/cloudinary');
 const upload = multer({ storage });
 
 // Get all donations with pagination and filters
+// backend/routes/admin.js - Update the donations endpoint
 router.get('/donations', async (req, res) => {
   try {
-    console.log('Fetching donations...');
+    console.log('🔍 Fetching donations...');
     const { page = 1, limit = 1000, status, search } = req.query;
     const where = {};
     
@@ -23,9 +24,12 @@ router.get('/donations', async (req, res) => {
       where[Op.or] = [
         { participantName: { [Op.iLike]: `%${search}%` } },
         { email: { [Op.iLike]: `%${search}%` } },
-        { contactNumber1: { [Op.iLike]: `%${search}%` } }
+        { contactNumber1: { [Op.iLike]: `%${search}%` } },
+        { teammateName: { [Op.iLike]: `%${search}%` } }
       ];
     }
+    
+    console.log('📊 Query conditions:', where);
     
     const donations = await Donation.findAndCountAll({
       where,
@@ -34,13 +38,27 @@ router.get('/donations', async (req, res) => {
       order: [['createdAt', 'DESC']],
     });
 
-    console.log(`Found ${donations.count} donations`);
-    res.json(donations);
+    console.log(`✅ Found ${donations.count} donations`);
+    
+    // Ensure all amounts are numbers
+    const safeDonations = {
+      ...donations,
+      rows: donations.rows.map(donation => ({
+        ...donation.toJSON(),
+        amount: parseFloat(donation.amount) || 0,
+        actualAmount: donation.actualAmount ? parseFloat(donation.actualAmount) : null
+      }))
+    };
+    
+    res.json(safeDonations);
   } catch (error) {
-    console.error('Error in /admin/donations:', error);
+    console.error('❌ Error in /admin/donations:', error);
+    console.error('❌ Error details:', error.message);
+    console.error('❌ Error stack:', error.stack);
     res.status(500).json({ 
       error: 'Failed to fetch donations',
-      details: error.message
+      details: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 });
