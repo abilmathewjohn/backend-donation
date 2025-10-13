@@ -47,7 +47,7 @@ const AdminSettings = require('./AdminSettings')(sequelize);
 // Sync database
 const syncDatabase = async () => {
   try {
-    await sequelize.sync({ force: false });
+    await sequelize.sync({ alter: true }); // Changed to alter: true to add missing columns
     console.log('✅ Database synced successfully');
     
     // Create default admin settings
@@ -57,7 +57,12 @@ const syncDatabase = async () => {
         defaults: {
           contactPhone: '+3XXXXXXXXX',
           ticketPrice: 2.00,
-          adminEmail: 'admin@example.com'
+          adminEmail: 'admin@example.com',
+          orgName: 'Your Organization', // Now safe since column will exist
+          logoUrl: null,
+          logoPublicId: null,
+          banners: [],
+          bannerPublicIds: []
         }
       });
       
@@ -73,7 +78,6 @@ const syncDatabase = async () => {
     console.error('❌ Error syncing database:', error);
   }
 };
-
 syncDatabase();
 
 module.exports = {
