@@ -1,10 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
 const { Donation, AdminSettings } = require('../models');
-const { storage, uploadImage, deleteImage, getImageUrl } = require('../utils/cloudinary');
+const { storage, deleteImage } = require('../utils/cloudinary');
 
 // Configure multer with Cloudinary storage
 const upload = multer({ 
@@ -21,97 +19,75 @@ const upload = multer({
   }
 });
 
-// Get ticket price
 router.get('/ticket-price', async (req, res) => {
   try {
     const settings = await AdminSettings.findOne();
-    res.json({ ticketPrice: settings?.ticketPrice || 2.00 });
+    if (!settings) {
+      return res.json({ ticketPrice: 2.00 }); // Fallback to default
+    }
+    res.json({ ticketPrice: settings.ticketPrice || 2.00 });
   } catch (error) {
     console.error('Error fetching ticket price:', error);
-    res.status(500).json({ error: 'Failed to fetch ticket price' });
+    res.status(500).json({ error: 'Failed to fetch ticket price', details: error.message });
   }
 });
 
 // Create donation with Cloudinary
 router.post('/', upload.single('screenshot'), async (req, res) => {
-  console.log('📥 Received donation submission:', req.body);
-
   try {
-    const { fullName, email, phone, location, tickets, paymentLinkUsed } = req.body;
-    
-    // Validate required fields
-    if (!fullName || !email || !phone || !location || !tickets || !paymentLinkUsed) {
-      return res.status(400).json({ 
-        error: 'All fields are required',
-        missing: {
-          fullName: !fullName,
-          email: !email,
-          phone: !phone,
-          location: !location,
-          tickets: !tickets,
-          paymentLinkUsed: !paymentLinkUsed
-        }
-      });
-    }
-
-    if (!req.file) {
-      return res.status(400).json({ error: 'Payment screenshot is required' });
-    }
+    const { 
+      participantName, 
+      teammateName, 
+      address, 
+      contactNumber1, 
+      contactNumber2, 
+      email, 
+      whatsappNumber, 
+      zone, 
+      howKnown, 
+      otherHowKnown, 
+      diocese, 
+      previousParticipation, 
+      paymentLinkUsed 
+    } = req.body;
 
     const settings = await AdminSettings.findOne();
-    const ticketCount = parseInt(tickets);
-    
-    if (ticketCount < 1 || ticketCount > 50) {
-      return res.status(400).json({ error: 'Number of tickets must be between 1 and 50' });
-    }
-
-    const amount = (settings?.ticketPrice || 2.00) * ticketCount;
-    
-    // Cloudinary file info is available in req.file
-    const cloudinaryFile = req.file;
+    const totalAmount = (settings?.pricePerTeam || 20.00) + (settings?.registrationFee || 20.00);
     
     const donation = await Donation.create({
-      fullName: fullName.trim(),
+      participantName: participantName.trim(),
+      teammateName: teammateName.trim(),
+      address: address.trim(),
+      contactNumber1: contactNumber1.trim(),
+      contactNumber2: contactNumber2?.trim(),
       email: email.trim().toLowerCase(),
-      phone: phone.trim(),
-      location: location.trim(),
-      tickets: ticketCount,
-      amount: amount,
-      paymentScreenshot: cloudinaryFile.path, // Cloudinary URL
-      paymentScreenshotPublicId: cloudinaryFile.filename, // Cloudinary public_id
+      whatsappNumber: whatsappNumber.trim(),
+      zone: zone.trim(),
+      howKnown: howKnown.trim(),
+      otherHowKnown: otherHowKnown?.trim(),
+      diocese: diocese.trim(),
+      previousParticipation: previousParticipation === 'true',
+      teamRegistration: true, // Always true for team registration
+      amount: totalAmount,
+      paymentScreenshot: req.file.path,
+      paymentScreenshotPublicId: req.file.filename,
       paymentLinkUsed: paymentLinkUsed.trim(),
     });
 
-    console.log('✅ Donation created successfully:', donation.id);
-    console.log('📸 Image stored in Cloudinary:', cloudinaryFile.path);
-
     res.status(201).json({
-      message: 'Donation submitted successfully! Your tickets will be sent to your email after confirmation.',
+      message: 'Team registration submitted successfully!',
       donation: {
         id: donation.id,
-        fullName: donation.fullName,
+        participantName: donation.participantName,
         email: donation.email,
-        tickets: donation.tickets,
         amount: donation.amount,
         status: donation.status,
-        paymentScreenshot: donation.paymentScreenshot
       }
     });
   } catch (error) {
-    console.error('❌ Error creating donation:', error);
-    
-    // Delete uploaded file from Cloudinary if donation creation failed
-    if (req.file && req.file.filename) {
-      try {
-        await deleteImage(req.file.filename);
-        console.log('🗑️ Deleted uploaded image from Cloudinary due to error');
-      } catch (deleteError) {
-        console.error('Error deleting image from Cloudinary:', deleteError);
-      }
-    }
-
+    console.error('Error creating donation:', error);
     res.status(500).json({ 
-      error: 'Failed to submit donation',
+      error: 'Failed to submit registration',
       details: error.message 
     });
   }
