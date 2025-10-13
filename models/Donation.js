@@ -7,23 +7,8 @@ module.exports = (sequelize) => {
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
     },
-    // Organization details
-    organizationName: {
+    participantName: {
       type: DataTypes.STRING,
-      defaultValue: 'Our Organization',
-    },
-    organizationLogo: {
-      type: DataTypes.STRING,
-      allowNull: true,
-    },
-    bannerImage: {
-      type: DataTypes.STRING,
-      allowNull: true,
-    },
-    
-    // Personal Information
-    fullName: {
-      type: DataTypes.STRING(25),
       allowNull: false,
       validate: {
         notEmpty: true,
@@ -31,20 +16,34 @@ module.exports = (sequelize) => {
       }
     },
     teammateName: {
-      type: DataTypes.STRING(25),
-      allowNull: true,
+      type: DataTypes.STRING,
+      allowNull: false,
+      validate: {
+        notEmpty: true,
+        len: [1, 25]
+      }
     },
     address: {
-      type: DataTypes.TEXT,
+      type: DataTypes.STRING,
       allowNull: false,
+      validate: {
+        notEmpty: true
+      }
     },
     contactNumber1: {
-      type: DataTypes.STRING(11),
+      type: DataTypes.STRING,
       allowNull: false,
+      validate: {
+        notEmpty: true,
+        len: [1, 11]
+      }
     },
     contactNumber2: {
-      type: DataTypes.STRING(11),
+      type: DataTypes.STRING,
       allowNull: true,
+      validate: {
+        len: [0, 11]
+      }
     },
     email: {
       type: DataTypes.STRING,
@@ -55,40 +54,48 @@ module.exports = (sequelize) => {
       }
     },
     whatsappNumber: {
-      type: DataTypes.STRING(11),
-      allowNull: false,
-    },
-    zone: {
-      type: DataTypes.STRING(15),
-      allowNull: false,
-    },
-    
-    // Program Information
-    howDidYouKnow: {
       type: DataTypes.STRING,
-      allowNull: false,
-    },
-    howDidYouKnowOther: {
-      type: DataTypes.STRING,
-      allowNull: true,
-    },
-    dioceseInKerala: {
-      type: DataTypes.STRING,
-      allowNull: false,
-    },
-    previouslyParticipated: {
-      type: DataTypes.BOOLEAN,
-      defaultValue: false,
-    },
-    
-    // Donation Information
-    tickets: {
-      type: DataTypes.INTEGER,
       allowNull: false,
       validate: {
-        min: 1,
-        max: 50
+        notEmpty: true,
+        len: [1, 11]
       }
+    },
+    zone: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      validate: {
+        notEmpty: true,
+        len: [1, 15]
+      }
+    },
+    howKnown: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      validate: {
+        notEmpty: true
+      }
+    },
+    otherHowKnown: {
+      type: DataTypes.STRING,
+      allowNull: true
+    },
+    diocese: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      validate: {
+        notEmpty: true
+      }
+    },
+    previousParticipation: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+    },
+    // UPDATED: Changed from tickets to team registration
+    teamRegistration: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: true,
     },
     amount: {
       type: DataTypes.DECIMAL(10, 2),
@@ -98,16 +105,12 @@ module.exports = (sequelize) => {
       type: DataTypes.DECIMAL(10, 2),
       allowNull: true,
     },
-    ticketsAssigned: {
-      type: DataTypes.INTEGER,
-      allowNull: true,
-    },
     paymentScreenshot: {
-      type: DataTypes.STRING,
+      type: DataTypes.STRING, // Cloudinary URL
       allowNull: false,
     },
     paymentScreenshotPublicId: {
-      type: DataTypes.STRING,
+      type: DataTypes.STRING, // Cloudinary public_id for deletion
       allowNull: true,
     },
     paymentLinkUsed: {
@@ -117,6 +120,11 @@ module.exports = (sequelize) => {
     status: {
       type: DataTypes.ENUM('pending', 'confirmed', 'rejected'),
       defaultValue: 'pending',
+    },
+    // UPDATED: For team-based system
+    teamTickets: {
+      type: DataTypes.INTEGER,
+      defaultValue: 1,
     },
     ticketNumbers: {
       type: DataTypes.ARRAY(DataTypes.STRING),
