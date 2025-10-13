@@ -7,24 +7,46 @@ module.exports = (sequelize) => {
       defaultValue: 'default-settings',
       primaryKey: true,
     },
-    // Organization Settings
-    organizationName: {
-      type: DataTypes.STRING,
-      defaultValue: 'Quiz Program Organization',
-    },
-    organizationLogo: {
-      type: DataTypes.STRING,
-      allowNull: true,
-    },
-    bannerImage: {
-      type: DataTypes.STRING,
-      allowNull: true,
-    },
-    
-    // Contact Settings
     contactPhone: {
       type: DataTypes.STRING,
       defaultValue: '+3XXXXXXXXX',
+    },
+    ticketPrice: {
+      type: DataTypes.DECIMAL(10, 2),
+      defaultValue: 2.00,
+      validate: {
+        min: 0.01
+      }
+    },
+    // NEW: Team-based pricing fields
+    pricingMode: {
+      type: DataTypes.ENUM('per_ticket', 'per_person', 'per_team'),
+      defaultValue: 'per_ticket',
+    },
+    pricePerPerson: {
+      type: DataTypes.DECIMAL(10, 2),
+      defaultValue: 10.00,
+      validate: {
+        min: 0.01
+      }
+    },
+    pricePerTeam: {
+      type: DataTypes.DECIMAL(10, 2),
+      defaultValue: 20.00,
+      validate: {
+        min: 0.01
+      }
+    },
+    registrationFee: {
+      type: DataTypes.DECIMAL(10, 2),
+      defaultValue: 20.00,
+      validate: {
+        min: 0.01
+      }
+    },
+    pricingDescription: {
+      type: DataTypes.TEXT,
+      defaultValue: '1 team = €20.00 (€10 per person), Registration fee: €20.00',
     },
     adminEmail: {
       type: DataTypes.STRING,
@@ -33,52 +55,24 @@ module.exports = (sequelize) => {
         isEmail: true
       }
     },
-    
-    // Ticket Settings
-    ticketPrice: {
-      type: DataTypes.DECIMAL(10, 2),
-      defaultValue: 2.00,
-      validate: {
-        min: 0.01
-      }
+    orgName: {
+      type: DataTypes.STRING,
+      defaultValue: 'Your Organization',
     },
-    
-    // Program Options
-    dioceseOptions: {
-      type: DataTypes.ARRAY(DataTypes.STRING),
-      defaultValue: [
-        'Trivandrum',
-        'Kollam',
-        'Thiruvalla',
-        'Kottayam',
-        'Kanjirappally',
-        'Palai',
-        'Ernakulam',
-        'Kothamangalam',
-        'Idukki',
-        'Thrissur',
-        'Palghat',
-        'Calicut',
-        'Sultan Bathery',
-        'Tellicherry',
-        'Mananthavady',
-        'Kannur'
-      ]
+    logoUrl: {
+      type: DataTypes.STRING,
     },
-    
-    // How did you know options
-    howDidYouKnowOptions: {
+    logoPublicId: {
+      type: DataTypes.STRING,
+    },
+    banners: {
       type: DataTypes.ARRAY(DataTypes.STRING),
-      defaultValue: [
-        'Social Media',
-        'Friends',
-        'Website',
-        'Church',
-        'Poster',
-        'Newspaper',
-        'Other'
-      ]
-    }
+      defaultValue: [],
+    },
+    bannerPublicIds: {
+      type: DataTypes.ARRAY(DataTypes.STRING),
+      defaultValue: [],
+    },
   }, {
     timestamps: true,
   });
