@@ -1,9 +1,12 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
 const { Donation, PaymentLink, AdminSettings } = require('../models');
 const { deleteImage } = require('../utils/cloudinary');
 const { Op } = require('sequelize');
 const { sendTicketEmail } = require('../utils/emailService'); // Adjust path as needed
+const { storage } = require('../utils/cloudinary');
+const upload = multer({ storage });
 
 // Get all donations with pagination and filters
 router.get('/donations', async (req, res) => {
@@ -18,9 +21,9 @@ router.get('/donations', async (req, res) => {
     
     if (search) {
       where[Op.or] = [
-        { fullName: { [Op.iLike]: `%${search}%` } },
+        { participantName: { [Op.iLike]: `%${search}%` } },
         { email: { [Op.iLike]: `%${search}%` } },
-        { phone: { [Op.iLike]: `%${search}%` } }
+        { contactNumber1: { [Op.iLike]: `%${search}%` } }
       ];
     }
     
@@ -224,11 +227,11 @@ router.get('/donations/export', async (req, res) => {
     });
 
     // Simple CSV export
-    const csvHeaders = 'Full Name,Email,Phone,Location,Requested Tickets,Requested Amount,Actual Amount,Tickets Assigned,Status,Payment Link,Screenshot URL,Date\n';
+    const csvHeaders = 'Participant Name,Teammate Name,Address,Contact 1,Contact 2,Email,WhatsApp,Zone,Diocese,How Known,Other How Known,Previous Participation,Requested Tickets,Requested Amount,Actual Amount,Tickets Assigned,Status,Payment Link,Screenshot URL,Date\n';
     
     const csvData = donations.map(donation => {
       const ticketNumbers = donation.ticketNumbers ? donation.ticketNumbers.join('; ') : '';
-      return `"${donation.fullName}","${donation.email}","${donation.phone}","${donation.location}",${donation.tickets},${donation.amount},${donation.actualAmount || ''},${donation.ticketsAssigned || ''},${donation.status},"${donation.paymentLinkUsed}","${donation.paymentScreenshot}","${donation.createdAt}"`;
+      return `"${donation.participantName}","${donation.teammateName}","${donation.address}","${donation.contactNumber1}","${donation.contactNumber2 || ''}","${donation.email}","${donation.whatsappNumber}","${donation.zone}","${donation.diocese}","${donation.howKnown}","${donation.otherHowKnown || ''}","${donation.previousParticipation ? 'Yes' : 'No'}",${donation.tickets},${donation.amount},${donation.actualAmount || ''},${donation.ticketsAssigned || ''},${donation.status},"${donation.paymentLinkUsed}","${donation.paymentScreenshot}","${donation.createdAt}"`;
     }).join('\n');
 
     const csv = csvHeaders + csvData;
@@ -256,18 +259,106 @@ router.get('/settings', async (req, res) => {
 // Update admin settings
 router.put('/settings', async (req, res) => {
   try {
-    const { contactPhone, ticketPrice, adminEmail } = req.body;
+    const { 
+      contactPhone, 
+      ticketPrice, 
+      adminEmail, 
+      orgName,
+      pricingMode,
+      pricePerPerson,
+      pricePerTeam,
+      registrationFee,
+      pricingDescription
+    } = req.body;
+    
     let settings = await AdminSettings.findOne();
     
     if (!settings) {
-      settings = await AdminSettings.create({ contactPhone, ticketPrice, adminEmail });
+      settings = await AdminSettings.create({ 
+        contactPhone, 
+        ticketPrice, 
+        adminEmail, 
+        orgName,
+        pricingMode,
+        pricePerPerson,
+        pricePerTeam,
+        registrationFee,
+        pricingDescription
+      });
     } else {
-      await settings.update({ contactPhone, ticketPrice, adminEmail });
+      await settings.update({ 
+        contactPhone, 
+        ticketPrice, 
+        adminEmail, 
+        orgName,
+        pricingMode,
+        pricePerPerson,
+        pricePerTeam,
+        registrationFee,
+        pricingDescription
+      });
     }
 
     res.json(settings);
   } catch (error) {
     console.error('Error updating settings:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Upload logo
+router.post('/upload-logo', upload.single('logo'), async (req, res) => {
+  try {
+    const settings = await AdminSettings.findOne();
+    if (settings.logoPublicId) {
+      await deleteImage(settings.logoPublicId);
+    }
+    await settings.update({
+      logoUrl: req.file.path,
+      logoPublicId: req.file.filename
+    });
+    res.json({ logoUrl: req.file.path });
+  } catch (error) {
+    console.error('Error uploading logo:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Upload banner
+router.post('/upload-banner', upload.single('banner'), async (req, res) => {
+  try {
+    const settings = await AdminSettings.findOne();
+    const newBanners = [...(settings.banners || []), req.file.path];
+    const newPublicIds = [...(settings.bannerPublicIds || []), req.file.filename];
+    await settings.update({
+      banners: newBanners,
+      bannerPublicIds: newPublicIds
+    });
+    res.json({ banners: newBanners });
+  } catch (error) {
+    console.error('Error uploading banner:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Remove banner
+router.post('/remove-banner', async (req, res) => {
+  try {
+    const { publicId } = req.body;
+    await deleteImage(publicId);
+    const settings = await AdminSettings.findOne();
+    const index = settings.bannerPublicIds.indexOf(publicId);
+    if (index > -1) {
+      settings.banners.splice(index, 1);
+      settings.bannerPublicIds.splice(index, 1);
+      await settings.update({
+        banners: settings.banners,
+        bannerPublicIds: settings.bannerPublicIds
+      });
+    }
+    res.json({ banners: settings.banners });
+  } catch (error) {
+    console.error('Error removing banner:', error);
     res.status(500).json({ error: error.message });
   }
 });
