@@ -56,10 +56,10 @@ module.exports = (sequelize) => {
     type: DataTypes.BOOLEAN,
     allowNull: false,
   },
-  amount: {
-    type: DataTypes.DECIMAL(10, 2),
-    allowNull: false,
-  },
+amount: {
+  type: DataTypes.DECIMAL(10, 2), 
+  allowNull: false,
+},
   paymentScreenshot: {
     type: DataTypes.STRING,
     allowNull: false,
