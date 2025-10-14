@@ -66,50 +66,45 @@ router.patch('/donations/:id/status', async (req, res) => {
 
     const updateData = { status };
     
-    // INSTANT Team ID generation for confirmed status
     if (status === 'confirmed') {
       console.log('⚡ INSTANT Team ID generation');
-      
-      // Generate Team ID instantly (takes <1ms)
       const teamId = generateTeamId();
       updateData.teamId = teamId;
       updateData.actualAmount = parseFloat(actualAmount) || parseFloat(donation.amount) || 0;
-      
       console.log('🎯 Team ID generated:', teamId);
     }
 
-    // Quick database update
     console.log('💾 Quick database update...');
     await donation.update(updateData);
     console.log('✅ Database updated');
 
-    // Get updated donation
     const updatedDonation = await Donation.findByPk(donationId);
-    
-    // Send immediate response
+    console.log('Updated donation data:', updatedDonation.toJSON());
+
+    let emailResult = { success: true, message: 'No email sent' };
+    if (status === 'confirmed' && updatedDonation.teamId) {
+      console.log('📧 Starting email process...');
+      if (!updatedDonation.email || !updatedDonation.participantName || !updatedDonation.teammateName) {
+        console.error('Missing required donation fields for email:', updatedDonation.toJSON());
+        emailResult = { success: false, message: 'Missing required donation fields for email' };
+      } else {
+        try {
+          const success = await sendTeamConfirmationEmail(updatedDonation, updatedDonation.teamId);
+          emailResult = success
+            ? { success: true, message: 'Confirmation email sent successfully' }
+            : { success: false, message: 'Failed to send confirmation email' };
+        } catch (emailError) {
+          console.error('💥 Email error:', emailError.message);
+          emailResult = { success: false, message: `Email error: ${emailError.message}` };
+        }
+      }
+    }
+
     res.json({
       message: 'Registration status updated successfully',
-      donation: updatedDonation
+      donation: updatedDonation,
+      email: emailResult,
     });
-
-    // Background email (non-blocking)
-    if (status === 'confirmed' && updatedDonation.teamId) {
-      console.log('📧 Starting background email process...');
-      
-      // Don't wait for email - send it in background
-      sendTeamConfirmationEmail(updatedDonation, updatedDonation.teamId)
-        .then(result => {
-          if (result) {
-            console.log('✅ Background email sent successfully');
-          } else {
-            console.log('❌ Background email failed (but status was updated)');
-          }
-        })
-        .catch(emailError => {
-          console.error('💥 Background email error:', emailError.message);
-        });
-    }
-    
   } catch (error) {
     console.error('❌ Error in status update:', error.message);
     res.status(500).json({ 
