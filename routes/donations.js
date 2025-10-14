@@ -4,6 +4,7 @@ const multer = require('multer');
 const { Donation, AdminSettings } = require('../models');
 const { storage, deleteImage } = require('../utils/cloudinary');
 
+
 // Configure multer with Cloudinary storage
 const upload = multer({ 
   storage: storage,
@@ -19,23 +20,10 @@ const upload = multer({
   }
 });
 
-router.get('/ticket-price', async (req, res) => {
-  try {
-    const settings = await AdminSettings.findOne();
-    if (!settings) {
-      return res.json({ ticketPrice: 2.00 }); // Fallback to default
-    }
-    res.json({ ticketPrice: settings.ticketPrice || 2.00 });
-  } catch (error) {
-    console.error('Error fetching ticket price:', error);
-    res.status(500).json({ error: 'Failed to fetch ticket price', details: error.message });
-  }
-});
-
 // Create donation with Cloudinary
-//Update the POST endpoint
 router.post('/', upload.single('screenshot'), async (req, res) => {
-  console.log('📥 Received team registration submission:', req.body);
+  console.log('📥 Received donation submission:', req.body);
+  console.log('📸 File received:', req.file);
 
   try {
     const { 
@@ -51,6 +39,7 @@ router.post('/', upload.single('screenshot'), async (req, res) => {
       otherHowKnown, 
       diocese, 
       previousParticipation, 
+      teamRegistration,
       paymentLinkUsed,
       amount
     } = req.body;
@@ -74,7 +63,7 @@ router.post('/', upload.single('screenshot'), async (req, res) => {
       return res.status(400).json({ error: 'Payment screenshot is required' });
     }
 
-    // Create team registration
+    // Create donation with team registration
     const donation = await Donation.create({
       participantName: participantName.trim(),
       teammateName: teammateName.trim(),
@@ -87,9 +76,8 @@ router.post('/', upload.single('screenshot'), async (req, res) => {
       howKnown: howKnown.trim(),
       otherHowKnown: otherHowKnown?.trim(),
       diocese: diocese.trim(),
-      previousParticipation: previousParticipation === 'true',
-      teamRegistration: true, // Always true for team registration
-      teamSize: 2, // Fixed team size of 2 persons
+      previousParticipation: previousParticipation === 'true' || previousParticipation === true,
+      teamRegistration: teamRegistration === 'true' || teamRegistration === true,
       amount: parseFloat(amount) || 0,
       paymentScreenshot: req.file.path,
       paymentScreenshotPublicId: req.file.filename,
@@ -97,23 +85,24 @@ router.post('/', upload.single('screenshot'), async (req, res) => {
       status: 'pending'
     });
 
-    console.log('✅ Team registration created successfully:', donation.id);
+    console.log('✅ Donation created successfully:', donation.id);
 
     res.status(201).json({
-      message: 'Team registration submitted successfully! Your registration will be confirmed via email.',
+      message: 'Registration submitted successfully! Your registration will be confirmed via email.',
       donation: {
         id: donation.id,
         participantName: donation.participantName,
-        teammateName: donation.teammateName,
         email: donation.email,
         amount: donation.amount,
         status: donation.status,
       }
     });
   } catch (error) {
-    console.error('❌ Error creating team registration:', error);
+    console.error('❌ Error creating donation:', error);
+    console.error('❌ Error details:', error.message);
+    console.error('❌ Error stack:', error.stack);
     
-    // Delete uploaded file if registration creation failed
+    // Delete uploaded file if donation creation failed
     if (req.file && req.file.filename) {
       try {
         await deleteImage(req.file.filename);
@@ -124,11 +113,26 @@ router.post('/', upload.single('screenshot'), async (req, res) => {
     }
 
     res.status(500).json({ 
-      error: 'Failed to submit team registration',
-      details: error.message 
+      error: 'Failed to submit registration',
+      details: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 });
+
+router.get('/ticket-price', async (req, res) => {
+  try {
+    const settings = await AdminSettings.findOne();
+    if (!settings) {
+      return res.json({ ticketPrice: 2.00 }); // Fallback to default
+    }
+    res.json({ ticketPrice: settings.ticketPrice || 2.00 });
+  } catch (error) {
+    console.error('Error fetching ticket price:', error);
+    res.status(500).json({ error: 'Failed to fetch ticket price', details: error.message });
+  }
+});
+
 
 // Get image URL for a donation
 router.get('/:id/screenshot', async (req, res) => {
