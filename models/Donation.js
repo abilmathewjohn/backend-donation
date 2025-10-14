@@ -56,12 +56,7 @@ module.exports = (sequelize) => {
       type: DataTypes.BOOLEAN,
       allowNull: false,
     },
-    // Make tickets optional for team registration
-    tickets: {
-      type: DataTypes.INTEGER,
-      allowNull: true, // Changed to true
-      defaultValue: 0,
-    },
+    // Remove tickets field
     amount: {
       type: DataTypes.DECIMAL(10, 2),
       allowNull: false,
@@ -70,10 +65,7 @@ module.exports = (sequelize) => {
       type: DataTypes.DECIMAL(10, 2),
       allowNull: true,
     },
-    ticketsAssigned: {
-      type: DataTypes.INTEGER,
-      allowNull: true,
-    },
+    // Remove ticketsAssigned field
     paymentScreenshot: {
       type: DataTypes.STRING,
       allowNull: false,
@@ -90,18 +82,20 @@ module.exports = (sequelize) => {
       type: DataTypes.ENUM('pending', 'confirmed', 'rejected'),
       defaultValue: 'pending',
     },
-    ticketNumbers: {
-      type: DataTypes.ARRAY(DataTypes.STRING),
-      defaultValue: [],
-    },
-    // New team registration fields
+    // Remove ticketNumbers field
+    
+    // Team registration fields
     teamRegistration: {
       type: DataTypes.BOOLEAN,
       defaultValue: true,
     },
-    teamTickets: {
+    teamId: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    teamSize: {
       type: DataTypes.INTEGER,
-      defaultValue: 1,
+      defaultValue: 2, // 1 team = 2 persons
     },
   }, {
     tableName: 'Donations',
