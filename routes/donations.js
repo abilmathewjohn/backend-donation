@@ -20,8 +20,7 @@ const upload = multer({
   }
 });
 
-// Create donation with Cloudinary
-// backend/routes/donations.js
+// backend/routes/donations.js - Update the amount parsing section
 router.post('/', upload.single('screenshot'), async (req, res) => {
   console.log('📥 Received donation submission:', req.body);
   console.log('📸 File received:', req.file);
@@ -64,30 +63,52 @@ router.post('/', upload.single('screenshot'), async (req, res) => {
       return res.status(400).json({ error: 'Payment screenshot is required' });
     }
 
-    // FIX: Properly parse and validate the amount
+    // DEBUG: Log the raw amount received
+    console.log('🔍 Raw amount received:', amount, 'Type:', typeof amount);
+
+    // FIX: More robust amount parsing
     let parsedAmount;
     try {
-      // Remove any non-numeric characters except decimal point
-      const cleanAmount = amount.toString().replace(/[^\d.]/g, '');
-      parsedAmount = parseFloat(cleanAmount);
+      // Handle different formats that might come from the frontend
+      if (typeof amount === 'string') {
+        // Remove any extra formatting or thousand separators
+        let cleanAmount = amount.replace(/[^\d.,]/g, '');
+        
+        // Handle European format (comma as decimal separator)
+        if (cleanAmount.includes(',') && !cleanAmount.includes('.')) {
+          cleanAmount = cleanAmount.replace(',', '.');
+        }
+        
+        // Remove any extra decimal points (like in "20.000.00")
+        const parts = cleanAmount.split('.');
+        if (parts.length > 2) {
+          // If there are multiple decimal points, take the first part as integer and last part as decimal
+          cleanAmount = `${parts[0]}.${parts[parts.length - 1]}`;
+        }
+        
+        parsedAmount = parseFloat(cleanAmount);
+      } else {
+        parsedAmount = parseFloat(amount);
+      }
       
       if (isNaN(parsedAmount) || parsedAmount <= 0) {
         return res.status(400).json({ 
           error: 'Invalid amount format',
-          details: `Amount must be a positive number. Received: ${amount}`
+          details: `Amount must be a positive number. Received: ${amount} (parsed as: ${parsedAmount})`
         });
       }
       
-      // Round to 2 decimal places
+      // Ensure exactly 2 decimal places
       parsedAmount = Math.round(parsedAmount * 100) / 100;
     } catch (parseError) {
+      console.error('❌ Amount parsing error:', parseError);
       return res.status(400).json({ 
         error: 'Invalid amount format',
-        details: `Could not parse amount: ${amount}`
+        details: `Could not parse amount: ${amount}. Error: ${parseError.message}`
       });
     }
 
-    console.log('💰 Parsed amount:', parsedAmount);
+    console.log('💰 Final parsed amount:', parsedAmount, 'Type:', typeof parsedAmount);
 
     // Create donation with team registration
     const donation = await Donation.create({
