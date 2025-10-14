@@ -88,13 +88,10 @@ router.patch('/donations/:id/status', async (req, res) => {
       }
       
       // Generate team ID if not exists
-      let teamId = donation.teamId;
-      if (!teamId) {
-        teamId = `TEAM-${donation.id.slice(-8).toUpperCase()}`;
+      if (!donation.teamId) {
+        const teamId = `TEAM-${donation.id.slice(-8).toUpperCase()}`;
         updateData.teamId = teamId;
         console.log('🆔 Generated team ID:', teamId);
-      } else {
-        console.log('🆔 Using existing team ID:', teamId);
       }
       
     } else {
@@ -106,46 +103,38 @@ router.patch('/donations/:id/status', async (req, res) => {
     await donation.update(updateData);
     console.log('✅ Database update successful');
 
-    // Send team confirmation email if confirmed
-    if (status === 'confirmed') {
+    // Send team confirmation email if confirmed and has team ID
+    if (status === 'confirmed' && updateData.teamId) {
       console.log('📧 Attempting to send team confirmation email...');
       console.log('📨 Recipient email:', donation.email);
+      console.log('🆔 Team ID:', updateData.teamId);
       
-      // Get the updated donation with team ID
-      const updatedDonation = await Donation.findByPk(donationId);
-      const finalTeamId = updatedDonation.teamId;
-      
-      console.log('🆔 Team ID for email:', finalTeamId);
-      
-      if (finalTeamId) {
-        try {
-          console.log('🎯 Calling sendTeamConfirmationEmail function...');
-          const emailResult = await sendTeamConfirmationEmail(updatedDonation, finalTeamId);
-          console.log('✅ Email function result:', emailResult);
-          
-          if (emailResult) {
-            console.log('🎉 Team confirmation email sent successfully!');
-          } else {
-            console.log('❌ Email function returned false - email not sent');
-          }
-        } catch (emailError) {
-          console.error('💥 Error sending team confirmation email:', emailError);
-          console.error('Email error stack:', emailError.stack);
-          // Don't fail the whole request if email fails
+      try {
+        const emailResult = await sendTeamConfirmationEmail(donation, updateData.teamId);
+        console.log('✅ Email function result:', emailResult);
+        
+        if (emailResult) {
+          console.log('🎉 Team confirmation email sent successfully!');
+        } else {
+          console.log('❌ Email function returned false');
         }
-      } else {
-        console.log('❌ No team ID available for email');
+      } catch (emailError) {
+        console.error('💥 Error sending team confirmation email:', emailError);
+        console.error('Email error stack:', emailError.stack);
       }
     } else {
-      console.log('📧 Email not sent because status is:', status);
+      console.log('📧 Email not sent because:', {
+        status,
+        hasTeamId: !!(updateData.teamId)
+      });
     }
 
-    const finalUpdatedDonation = await Donation.findByPk(donationId);
-    console.log('✅ Final updated donation:', finalUpdatedDonation.toJSON());
+    const updatedDonation = await Donation.findByPk(req.params.id);
+    console.log('✅ Final updated donation:', updatedDonation.toJSON());
     
     res.json({
       message: 'Donation status updated successfully',
-      donation: finalUpdatedDonation
+      donation: updatedDonation
     });
     
   } catch (error) {
