@@ -79,23 +79,46 @@ router.patch('/donations/:id/status', async (req, res) => {
     console.log('✅ Database updated');
 
     const updatedDonation = await Donation.findByPk(donationId);
-    console.log('Updated donation data:', updatedDonation.toJSON());
+    console.log('Updated donation data:', {
+      id: updatedDonation.id,
+      email: updatedDonation.email,
+      participantName: updatedDonation.participantName,
+      teammateName: updatedDonation.teammateName,
+      teamId: updatedDonation.teamId,
+      status: updatedDonation.status
+    });
 
     let emailResult = { success: true, message: 'No email sent' };
+    
+    // Only send email for confirmed status with team ID
     if (status === 'confirmed' && updatedDonation.teamId) {
       console.log('📧 Starting email process...');
-      if (!updatedDonation.email || !updatedDonation.participantName || !updatedDonation.teammateName) {
-        console.error('Missing required donation fields for email:', updatedDonation.toJSON());
-        emailResult = { success: false, message: 'Missing required donation fields for email' };
+      
+      // Validate required fields
+      const missingFields = [];
+      if (!updatedDonation.email) missingFields.push('email');
+      if (!updatedDonation.participantName) missingFields.push('participantName');
+      if (!updatedDonation.teammateName) missingFields.push('teammateName');
+      
+      if (missingFields.length > 0) {
+        console.error('❌ Missing required fields:', missingFields);
+        emailResult = { 
+          success: false, 
+          message: `Missing required fields: ${missingFields.join(', ')}` 
+        };
       } else {
         try {
+          console.log('✅ All email fields present, sending confirmation...');
           const success = await sendTeamConfirmationEmail(updatedDonation, updatedDonation.teamId);
           emailResult = success
             ? { success: true, message: 'Confirmation email sent successfully' }
             : { success: false, message: 'Failed to send confirmation email' };
         } catch (emailError) {
-          console.error('💥 Email error:', emailError.message);
-          emailResult = { success: false, message: `Email error: ${emailError.message}` };
+          console.error('💥 Email error in route:', emailError.message);
+          emailResult = { 
+            success: false, 
+            message: `Email error: ${emailError.message}` 
+          };
         }
       }
     }
@@ -107,6 +130,7 @@ router.patch('/donations/:id/status', async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Error in status update:', error.message);
+    console.error('Stack trace:', error.stack);
     res.status(500).json({ 
       error: 'Failed to update donation status',
       details: error.message 
