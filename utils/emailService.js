@@ -1,35 +1,67 @@
 // backend/utils/emailService.js
 const nodemailer = require('nodemailer');
 
-// Simple email function without complex setup
 const sendTeamConfirmationEmail = async (donation, teamId) => {
+  let transporter;
+  
   try {
-    console.log('📧 EMAIL ATTEMPT STARTED');
+    console.log('📧 EMAIL ATTEMPT STARTED - Railway Environment');
     console.log('To:', donation.email);
     console.log('Team ID:', teamId);
 
-    // Quick check for email configuration
-    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-      console.log('❌ EMAIL SKIPPED: No email credentials configured');
-      console.log('💡 Set EMAIL_USER and EMAIL_PASS in environment variables');
+    // Enhanced environment variable check
+    const emailUser = process.env.EMAIL_USER;
+    const emailPass = process.env.EMAIL_PASS;
+    
+    console.log('Email config check:', {
+      hasUser: !!emailUser,
+      hasPass: !!emailPass,
+      userLength: emailUser ? emailUser.length : 0,
+      env: process.env.NODE_ENV
+    });
+
+    if (!emailUser || !emailPass) {
+      console.error('❌ EMAIL CREDENTIALS MISSING');
+      console.error('EMAIL_USER:', emailUser ? 'Set' : 'Not set');
+      console.error('EMAIL_PASS:', emailPass ? 'Set' : 'Not set');
       return false;
     }
 
-    // Simple transporter setup
-    const transporter = nodemailer.createTransport({
+    // **RAILWAY-SPECIFIC CONFIGURATION**
+    const transporterConfig = {
       host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-      port: process.env.EMAIL_PORT || 587,
-      secure: false,
+      port: parseInt(process.env.EMAIL_PORT) || 587,
+      secure: false, // Use TLS
       auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      }
+        user: emailUser,
+        pass: emailPass,
+      },
+      // **CRITICAL FOR RAILWAY**
+      tls: {
+        rejectUnauthorized: false // May be needed in some environments
+      },
+      connectionTimeout: 30000, // 30 seconds
+      greetingTimeout: 30000,
+      socketTimeout: 30000
+    };
+
+    console.log('📧 Transporter config:', {
+      host: transporterConfig.host,
+      port: transporterConfig.port,
+      user: transporterConfig.auth.user.substring(0, 3) + '...'
     });
 
-    const finalActualAmount = donation.actualAmount || donation.amount;
+    transporter = nodemailer.createTransport(transporterConfig);
+
+    // **VERIFY CONNECTION FIRST**
+    console.log('🔍 Verifying SMTP connection...');
+    await transporter.verify();
+    console.log('✅ SMTP connection verified');
+
+    const finalActualAmount = donation.actualAmount || donation.amount || 0;
 
     const mailOptions = {
-      from: `"Team Registration" <${process.env.EMAIL_USER}>`,
+      from: `"Team Registration" <${emailUser}>`,
       to: donation.email,
       subject: `Team ${teamId} - Registration Confirmed`,
       html: `
@@ -81,26 +113,45 @@ Thank you for your registration!
 
     console.log('📤 Sending email now...');
     const info = await transporter.sendMail(mailOptions);
-    console.log('✅ EMAIL SENT SUCCESSFULLY:', info.messageId);
-    console.log('📧 Email response:', info.response);
+    console.log('✅ EMAIL SENT SUCCESSFULLY');
+    console.log('Message ID:', info.messageId);
+    console.log('Response:', info.response.substring(0, 100) + '...');
     
     return true;
     
   } catch (error) {
     console.error('❌ EMAIL FAILED:', error.message);
-    console.error('Email error details:', {
-      code: error.code,
-      command: error.command
-    });
+    console.error('Full error:', error);
     
-    // Check for common email errors
+    // Enhanced error diagnostics
+    if (error.code) {
+      console.error('Error code:', error.code);
+    }
+    if (error.command) {
+      console.error('Failed command:', error.command);
+    }
+    
+    // Common error scenarios
     if (error.code === 'EAUTH') {
-      console.error('🔐 Authentication failed - check email credentials');
+      console.error('🔐 AUTHENTICATION FAILED - Check:');
+      console.error('   • Email username/password');
+      console.error('   • App passwords for Gmail');
+      console.error('   • SMTP settings');
     } else if (error.code === 'ECONNECTION') {
-      console.error('🌐 Connection failed - check network/port settings');
+      console.error('🌐 CONNECTION FAILED - Check:');
+      console.error('   • SMTP host/port');
+      console.error('   • Firewall settings');
+      console.error('   • Network connectivity');
+    } else if (error.code === 'ETIMEDOUT') {
+      console.error('⏰ TIMEOUT - Increase timeout settings');
     }
     
     return false;
+  } finally {
+    // Close transporter to prevent connection leaks
+    if (transporter) {
+      transporter.close();
+    }
   }
 };
 
