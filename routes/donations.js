@@ -21,6 +21,7 @@ const upload = multer({
 });
 
 // Create donation with Cloudinary
+// backend/routes/donations.js
 router.post('/', upload.single('screenshot'), async (req, res) => {
   console.log('📥 Received donation submission:', req.body);
   console.log('📸 File received:', req.file);
@@ -63,6 +64,31 @@ router.post('/', upload.single('screenshot'), async (req, res) => {
       return res.status(400).json({ error: 'Payment screenshot is required' });
     }
 
+    // FIX: Properly parse and validate the amount
+    let parsedAmount;
+    try {
+      // Remove any non-numeric characters except decimal point
+      const cleanAmount = amount.toString().replace(/[^\d.]/g, '');
+      parsedAmount = parseFloat(cleanAmount);
+      
+      if (isNaN(parsedAmount) || parsedAmount <= 0) {
+        return res.status(400).json({ 
+          error: 'Invalid amount format',
+          details: `Amount must be a positive number. Received: ${amount}`
+        });
+      }
+      
+      // Round to 2 decimal places
+      parsedAmount = Math.round(parsedAmount * 100) / 100;
+    } catch (parseError) {
+      return res.status(400).json({ 
+        error: 'Invalid amount format',
+        details: `Could not parse amount: ${amount}`
+      });
+    }
+
+    console.log('💰 Parsed amount:', parsedAmount);
+
     // Create donation with team registration
     const donation = await Donation.create({
       participantName: participantName.trim(),
@@ -78,7 +104,7 @@ router.post('/', upload.single('screenshot'), async (req, res) => {
       diocese: diocese.trim(),
       previousParticipation: previousParticipation === 'true' || previousParticipation === true,
       teamRegistration: teamRegistration === 'true' || teamRegistration === true,
-      amount: parseFloat(amount) || 0,
+      amount: parsedAmount, // Use the properly parsed amount
       paymentScreenshot: req.file.path,
       paymentScreenshotPublicId: req.file.filename,
       paymentLinkUsed: paymentLinkUsed.trim(),
