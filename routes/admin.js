@@ -315,4 +315,46 @@ router.post('/remove-banner', async (req, res) => {
   }
 });
 
+// Add this to your admin routes for testing email
+router.post('/test-email-config', async (req, res) => {
+  try {
+    console.log('🧪 Testing email configuration...');
+    
+    // Check environment variables
+    const hasEmailConfig = process.env.EMAIL_USER && process.env.EMAIL_PASS;
+    console.log('Email config present:', hasEmailConfig);
+    console.log('Email user:', process.env.EMAIL_USER ? 'Set' : 'Not set');
+    
+    if (!hasEmailConfig) {
+      return res.json({ 
+        success: false, 
+        message: 'Email credentials not configured in environment variables' 
+      });
+    }
+
+    // Test with a simple email
+    const testDonation = {
+      email: process.env.EMAIL_USER, // Send to yourself for testing
+      participantName: 'Test User',
+      teammateName: 'Test Teammate', 
+      actualAmount: 20.00,
+      amount: 20.00
+    };
+
+    const testTeamId = '123456';
+    
+    console.log('Sending test email...');
+    const result = await sendTeamConfirmationEmail(testDonation, testTeamId);
+    
+    if (result) {
+      res.json({ success: true, message: 'Test email sent successfully!' });
+    } else {
+      res.json({ success: false, message: 'Test email failed to send' });
+    }
+  } catch (error) {
+    console.error('Test email error:', error);
+    res.json({ success: false, message: error.message });
+  }
+});
+
 module.exports = router;
