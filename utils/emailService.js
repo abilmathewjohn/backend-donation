@@ -21,7 +21,7 @@ const sendTeamConfirmationEmail = async (donation, teamId) => {
       port: process.env.EMAIL_PORT || 587,
       secure: false,
       auth: {
-        user: process.env.EMAIL_USER ||"nordicpuffintechnologies@gmail.com",
+        user: process.env.EMAIL_USER || "nordicpuffintechnologies@gmail.com",
         pass: process.env.EMAIL_PASS || "hqwikqbcivwdvjhp",
       }
     });
@@ -83,23 +83,23 @@ Thank you for your registration!
     const info = await transporter.sendMail(mailOptions);
     console.log('✅ EMAIL SENT SUCCESSFULLY:', info.messageId);
     console.log('📧 Email response:', info.response);
-    
+
     return true;
-    
+
   } catch (error) {
     console.error('❌ EMAIL FAILED:', error.message);
     console.error('Email error details:', {
       code: error.code,
       command: error.command
     });
-    
+
     // Check for common email errors
     if (error.code === 'EAUTH') {
       console.error('🔐 Authentication failed - check email credentials');
     } else if (error.code === 'ECONNECTION') {
       console.error('🌐 Connection failed - check network/port settings');
     }
-    
+
     return false;
   }
 };
