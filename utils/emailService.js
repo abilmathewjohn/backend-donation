@@ -15,8 +15,8 @@ const sendTeamConfirmationEmail = async (donation, teamId) => {
       port: parseInt(process.env.SMTP_PORT) || 587,
       secure: false,
       auth: {
-        user: process.env.SMTP_USERNAME || process.env.EMAIL_USER,
-        pass: process.env.SMTP_PASSWORD || process.env.EMAIL_PASS,
+        user: process.env.EMAIL_USER || "nordicpuffintechnologies@gmail.com",
+        pass: process.env.EMAIL_PASS || "hqwikqbcivwdvjhp",
       },
       // **CRITICAL FOR RAILWAY**
       tls: {
