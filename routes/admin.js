@@ -4,12 +4,11 @@ const multer = require('multer');
 const { Donation, PaymentLink, AdminSettings } = require('../models');
 const { deleteImage } = require('../utils/cloudinary');
 const { Op } = require('sequelize');
-const { sendTicketEmail } = require('../utils/emailService'); // Adjust path as needed
+const { sendTeamConfirmationEmail } = require('../utils/emailService');
 const { storage } = require('../utils/cloudinary');
 const upload = multer({ storage });
 
-// Get all donations with pagination and filters
-// backend/routes/admin.js - Update the donations endpoint
+// Update the donations list endpoint to remove ticket-related fields
 router.get('/donations', async (req, res) => {
   try {
     console.log('🔍 Fetching donations...');
@@ -25,7 +24,8 @@ router.get('/donations', async (req, res) => {
         { participantName: { [Op.iLike]: `%${search}%` } },
         { email: { [Op.iLike]: `%${search}%` } },
         { contactNumber1: { [Op.iLike]: `%${search}%` } },
-        { teammateName: { [Op.iLike]: `%${search}%` } }
+        { teammateName: { [Op.iLike]: `%${search}%` } },
+        { teamId: { [Op.iLike]: `%${search}%` } } // Add team ID to search
       ];
     }
     
@@ -40,37 +40,24 @@ router.get('/donations', async (req, res) => {
 
     console.log(`✅ Found ${donations.count} donations`);
     
-    // Ensure all amounts are numbers
-    const safeDonations = {
-      ...donations,
-      rows: donations.rows.map(donation => ({
-        ...donation.toJSON(),
-        amount: parseFloat(donation.amount) || 0,
-        actualAmount: donation.actualAmount ? parseFloat(donation.actualAmount) : null
-      }))
-    };
-    
-    res.json(safeDonations);
+    res.json(donations);
   } catch (error) {
     console.error('❌ Error in /admin/donations:', error);
-    console.error('❌ Error details:', error.message);
-    console.error('❌ Error stack:', error.stack);
     res.status(500).json({ 
       error: 'Failed to fetch donations',
-      details: error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      details: error.message
     });
   }
 });
 
-// Update donation status
+//Update the status update endpoint
 router.patch('/donations/:id/status', async (req, res) => {
   try {
     console.log('🔔 PATCH /admin/donations/:id/status called');
     console.log('📦 Request params:', req.params);
     console.log('📦 Request body:', req.body);
     
-    const { status, actualAmount, ticketsToAssign, ticketNumbers } = req.body;
+    const { status, actualAmount } = req.body;
     const donationId = req.params.id;
     
     console.log('🔍 Looking for donation with ID:', donationId);
@@ -82,16 +69,12 @@ router.patch('/donations/:id/status', async (req, res) => {
     }
 
     console.log('✅ Donation found:', donation.id);
-    console.log('🔄 Updating donation with data:', { status, actualAmount, ticketsToAssign, ticketNumbers });
+    console.log('🔄 Updating donation with data:', { status, actualAmount });
 
     const updateData = { status };
-    const settings = await AdminSettings.findOne();
-    const ticketPrice = settings?.ticketPrice || 2.00;
     
-    console.log('🎫 Ticket price from settings:', ticketPrice);
-
     if (status === 'confirmed') {
-      console.log('✅ Status is confirmed, processing ticket assignment...');
+      console.log('✅ Status is confirmed, processing team registration...');
       
       // Handle actual amount
       if (actualAmount !== undefined && actualAmount !== null && actualAmount !== '') {
@@ -104,76 +87,65 @@ router.patch('/donations/:id/status', async (req, res) => {
         console.log('💰 Keeping existing actual amount:', donation.actualAmount);
       }
       
-      // Handle tickets assignment
-      let finalTicketsAssigned;
-      if (ticketsToAssign !== undefined && ticketsToAssign !== null && ticketsToAssign !== '') {
-        finalTicketsAssigned = parseInt(ticketsToAssign);
-        console.log('🎫 Using provided tickets to assign:', finalTicketsAssigned);
+      // Generate team ID if not exists
+      let teamId = donation.teamId;
+      if (!teamId) {
+        teamId = `TEAM-${donation.id.slice(-8).toUpperCase()}`;
+        updateData.teamId = teamId;
+        console.log('🆔 Generated team ID:', teamId);
       } else {
-        finalTicketsAssigned = Math.floor(updateData.actualAmount / ticketPrice);
-        console.log('🎫 Auto-calculated tickets:', finalTicketsAssigned, 'from amount', updateData.actualAmount);
+        console.log('🆔 Using existing team ID:', teamId);
       }
-      updateData.ticketsAssigned = finalTicketsAssigned;
-      
-      // Handle ticket numbers
-      let finalTicketNumbers = [];
-      if (ticketNumbers && ticketNumbers.trim()) {
-        finalTicketNumbers = ticketNumbers.split(',').map(t => t.trim()).filter(t => t);
-        console.log('🔢 Using provided ticket numbers:', finalTicketNumbers);
-      } else {
-        // Auto-generate ticket numbers
-        for (let i = 1; i <= finalTicketsAssigned; i++) {
-          finalTicketNumbers.push(`TICKET-${donation.id.slice(-8).toUpperCase()}-${i}`);
-        }
-        console.log('🔢 Auto-generated ticket numbers:', finalTicketNumbers);
-      }
-      updateData.ticketNumbers = finalTicketNumbers;
       
     } else {
-      console.log('❌ Status is not confirmed, clearing assignment data');
-      // Clear assignment data for non-confirmed status
-      updateData.actualAmount = null;
-      updateData.ticketsAssigned = null;
-      updateData.ticketNumbers = null;
+      console.log('❌ Status is not confirmed');
+      // Don't clear actualAmount as it might be useful for reference
     }
 
     console.log('💾 Saving update to database...');
     await donation.update(updateData);
     console.log('✅ Database update successful');
 
-    // Send email if confirmed and has tickets
-    if (status === 'confirmed' && updateData.ticketNumbers && updateData.ticketNumbers.length > 0) {
-      console.log('📧 Attempting to send ticket email...');
+    // Send team confirmation email if confirmed
+    if (status === 'confirmed') {
+      console.log('📧 Attempting to send team confirmation email...');
       console.log('📨 Recipient email:', donation.email);
-      console.log('🎫 Tickets to include:', updateData.ticketNumbers);
       
-      try {
-        const emailResult = await sendTicketEmail(donation, updateData.ticketNumbers);
-        console.log('✅ Email function result:', emailResult);
-        
-        if (emailResult) {
-          console.log('🎉 Ticket email sent successfully!');
-        } else {
-          console.log('❌ Email function returned false');
+      // Get the updated donation with team ID
+      const updatedDonation = await Donation.findByPk(donationId);
+      const finalTeamId = updatedDonation.teamId;
+      
+      console.log('🆔 Team ID for email:', finalTeamId);
+      
+      if (finalTeamId) {
+        try {
+          console.log('🎯 Calling sendTeamConfirmationEmail function...');
+          const emailResult = await sendTeamConfirmationEmail(updatedDonation, finalTeamId);
+          console.log('✅ Email function result:', emailResult);
+          
+          if (emailResult) {
+            console.log('🎉 Team confirmation email sent successfully!');
+          } else {
+            console.log('❌ Email function returned false - email not sent');
+          }
+        } catch (emailError) {
+          console.error('💥 Error sending team confirmation email:', emailError);
+          console.error('Email error stack:', emailError.stack);
+          // Don't fail the whole request if email fails
         }
-      } catch (emailError) {
-        console.error('💥 Error sending ticket email:', emailError);
-        console.error('Email error stack:', emailError.stack);
+      } else {
+        console.log('❌ No team ID available for email');
       }
     } else {
-      console.log('📧 Email not sent because:', {
-        status,
-        hasTicketNumbers: !!(updateData.ticketNumbers && updateData.ticketNumbers.length > 0),
-        ticketNumbersLength: updateData.ticketNumbers ? updateData.ticketNumbers.length : 0
-      });
+      console.log('📧 Email not sent because status is:', status);
     }
 
-    const updatedDonation = await Donation.findByPk(req.params.id);
-    console.log('✅ Final updated donation:', updatedDonation.toJSON());
+    const finalUpdatedDonation = await Donation.findByPk(donationId);
+    console.log('✅ Final updated donation:', finalUpdatedDonation.toJSON());
     
     res.json({
       message: 'Donation status updated successfully',
-      donation: updatedDonation
+      donation: finalUpdatedDonation
     });
     
   } catch (error) {
@@ -185,6 +157,7 @@ router.patch('/donations/:id/status', async (req, res) => {
     });
   }
 });
+
 
 // Delete donation and its image from Cloudinary
 router.delete('/donations/:id', async (req, res) => {
