@@ -5,63 +5,50 @@ const sendTeamConfirmationEmail = async (donation, teamId) => {
   let transporter;
   
   try {
-    console.log('📧 EMAIL ATTEMPT STARTED - Railway Environment');
+    console.log('📧 EMAIL ATTEMPT STARTED - Railway SMTP');
     console.log('To:', donation.email);
     console.log('Team ID:', teamId);
 
-    // Enhanced environment variable check
-    const emailUser = process.env.EMAIL_USER;
-    const emailPass = process.env.EMAIL_PASS;
-    
-    console.log('Email config check:', {
-      hasUser: !!emailUser,
-      hasPass: !!emailPass,
-      userLength: emailUser ? emailUser.length : 0,
-      env: process.env.NODE_ENV
-    });
-
-    if (!emailUser || !emailPass) {
-      console.error('❌ EMAIL CREDENTIALS MISSING');
-      console.error('EMAIL_USER:', emailUser ? 'Set' : 'Not set');
-      console.error('EMAIL_PASS:', emailPass ? 'Set' : 'Not set');
-      return false;
-    }
-
-    // **RAILWAY-SPECIFIC CONFIGURATION**
-    const transporterConfig = {
-      host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-      port: parseInt(process.env.EMAIL_PORT) || 587,
-      secure: false, // Use TLS
+    // **RAILWAY SMTP CONFIGURATION**
+    const smtpConfig = {
+      host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      port: parseInt(process.env.SMTP_PORT) || 587,
+      secure: false,
       auth: {
-        user: emailUser,
-        pass: emailPass,
+        user: process.env.SMTP_USERNAME || process.env.EMAIL_USER,
+        pass: process.env.SMTP_PASSWORD || process.env.EMAIL_PASS,
       },
       // **CRITICAL FOR RAILWAY**
       tls: {
-        rejectUnauthorized: false // May be needed in some environments
+        rejectUnauthorized: false
       },
-      connectionTimeout: 30000, // 30 seconds
-      greetingTimeout: 30000,
-      socketTimeout: 30000
+      connectionTimeout: 60000, // 60 seconds
+      greetingTimeout: 60000,
+      socketTimeout: 60000
     };
 
-    console.log('📧 Transporter config:', {
-      host: transporterConfig.host,
-      port: transporterConfig.port,
-      user: transporterConfig.auth.user.substring(0, 3) + '...'
+    console.log('📧 Using SMTP config:', {
+      host: smtpConfig.host,
+      port: smtpConfig.port,
+      user: smtpConfig.auth.user ? smtpConfig.auth.user.substring(0, 3) + '...' : 'not set'
     });
 
-    transporter = nodemailer.createTransport(transporterConfig);
+    transporter = nodemailer.createTransport(smtpConfig);
 
-    // **VERIFY CONNECTION FIRST**
+    // **VERIFY CONNECTION WITH TIMEOUT**
     console.log('🔍 Verifying SMTP connection...');
-    await transporter.verify();
+    await Promise.race([
+      transporter.verify(),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('SMTP verification timeout')), 30000)
+      )
+    ]);
     console.log('✅ SMTP connection verified');
 
     const finalActualAmount = donation.actualAmount || donation.amount || 0;
 
     const mailOptions = {
-      from: `"Team Registration" <${emailUser}>`,
+      from: `"Team Registration" <${process.env.FROM_EMAIL || process.env.EMAIL_USER}>`,
       to: donation.email,
       subject: `Team ${teamId} - Registration Confirmed`,
       html: `
@@ -88,26 +75,6 @@ const sendTeamConfirmationEmail = async (donation, teamId) => {
             This is an automated confirmation email.
           </p>
         </div>
-      `,
-      text: `
-TEAM REGISTRATION CONFIRMED!
-
-Dear ${donation.participantName},
-
-Your team registration has been confirmed!
-
-TEAM DETAILS:
-✅ Team ID: ${teamId}
-✅ Team Captain: ${donation.participantName}
-✅ Teammate: ${donation.teammateName}
-✅ Amount Paid: €${finalActualAmount}
-
-IMPORTANT:
-🔸 Your Team ID ${teamId} is required for event participation
-🔸 Please keep this email safe
-🔸 Contact us if you have any questions
-
-Thank you for your registration!
       `
     };
 
@@ -115,40 +82,18 @@ Thank you for your registration!
     const info = await transporter.sendMail(mailOptions);
     console.log('✅ EMAIL SENT SUCCESSFULLY');
     console.log('Message ID:', info.messageId);
-    console.log('Response:', info.response.substring(0, 100) + '...');
     
     return true;
     
   } catch (error) {
     console.error('❌ EMAIL FAILED:', error.message);
-    console.error('Full error:', error);
-    
-    // Enhanced error diagnostics
-    if (error.code) {
-      console.error('Error code:', error.code);
-    }
-    if (error.command) {
-      console.error('Failed command:', error.command);
-    }
-    
-    // Common error scenarios
-    if (error.code === 'EAUTH') {
-      console.error('🔐 AUTHENTICATION FAILED - Check:');
-      console.error('   • Email username/password');
-      console.error('   • App passwords for Gmail');
-      console.error('   • SMTP settings');
-    } else if (error.code === 'ECONNECTION') {
-      console.error('🌐 CONNECTION FAILED - Check:');
-      console.error('   • SMTP host/port');
-      console.error('   • Firewall settings');
-      console.error('   • Network connectivity');
-    } else if (error.code === 'ETIMEDOUT') {
-      console.error('⏰ TIMEOUT - Increase timeout settings');
-    }
+    console.error('Error details:', {
+      code: error.code,
+      command: error.command
+    });
     
     return false;
   } finally {
-    // Close transporter to prevent connection leaks
     if (transporter) {
       transporter.close();
     }
