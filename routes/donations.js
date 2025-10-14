@@ -33,10 +33,9 @@ router.get('/ticket-price', async (req, res) => {
 });
 
 // Create donation with Cloudinary
-// backend/routes/donations.js
+//Update the POST endpoint
 router.post('/', upload.single('screenshot'), async (req, res) => {
-  console.log('📥 Received donation submission:', req.body);
-  console.log('📸 File received:', req.file);
+  console.log('📥 Received team registration submission:', req.body);
 
   try {
     const { 
@@ -52,7 +51,6 @@ router.post('/', upload.single('screenshot'), async (req, res) => {
       otherHowKnown, 
       diocese, 
       previousParticipation, 
-      teamRegistration,
       paymentLinkUsed,
       amount
     } = req.body;
@@ -76,7 +74,7 @@ router.post('/', upload.single('screenshot'), async (req, res) => {
       return res.status(400).json({ error: 'Payment screenshot is required' });
     }
 
-    // Create donation with team registration
+    // Create team registration
     const donation = await Donation.create({
       participantName: participantName.trim(),
       teammateName: teammateName.trim(),
@@ -90,31 +88,32 @@ router.post('/', upload.single('screenshot'), async (req, res) => {
       otherHowKnown: otherHowKnown?.trim(),
       diocese: diocese.trim(),
       previousParticipation: previousParticipation === 'true',
-      teamRegistration: teamRegistration === 'true',
+      teamRegistration: true, // Always true for team registration
+      teamSize: 2, // Fixed team size of 2 persons
       amount: parseFloat(amount) || 0,
       paymentScreenshot: req.file.path,
       paymentScreenshotPublicId: req.file.filename,
       paymentLinkUsed: paymentLinkUsed.trim(),
-      tickets: 0, // Set to 0 for team registration
       status: 'pending'
     });
 
-    console.log('✅ Donation created successfully:', donation.id);
+    console.log('✅ Team registration created successfully:', donation.id);
 
     res.status(201).json({
-      message: 'Registration submitted successfully! Your registration will be confirmed via email.',
+      message: 'Team registration submitted successfully! Your registration will be confirmed via email.',
       donation: {
         id: donation.id,
         participantName: donation.participantName,
+        teammateName: donation.teammateName,
         email: donation.email,
         amount: donation.amount,
         status: donation.status,
       }
     });
   } catch (error) {
-    console.error('❌ Error creating donation:', error);
+    console.error('❌ Error creating team registration:', error);
     
-    // Delete uploaded file if donation creation failed
+    // Delete uploaded file if registration creation failed
     if (req.file && req.file.filename) {
       try {
         await deleteImage(req.file.filename);
@@ -125,7 +124,7 @@ router.post('/', upload.single('screenshot'), async (req, res) => {
     }
 
     res.status(500).json({ 
-      error: 'Failed to submit registration',
+      error: 'Failed to submit team registration',
       details: error.message 
     });
   }
