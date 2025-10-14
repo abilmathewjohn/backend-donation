@@ -7,6 +7,7 @@ const { Op } = require('sequelize');
 const { sendTeamConfirmationEmail } = require('../utils/emailService');
 const { storage } = require('../utils/cloudinary');
 const upload = multer({ storage });
+const { generateTeamId } = require('../utils/teamIdGenerator');
 
 // Update the donations list endpoint to remove ticket-related fields
 router.get('/donations', async (req, res) => {
@@ -50,96 +51,67 @@ router.get('/donations', async (req, res) => {
   }
 });
 
-//Update the status update endpoint
 router.patch('/donations/:id/status', async (req, res) => {
   try {
-    console.log('🔔 PATCH /admin/donations/:id/status called');
-    console.log('📦 Request params:', req.params);
-    console.log('📦 Request body:', req.body);
+    console.log('🚀 FAST STATUS UPDATE STARTED');
     
     const { status, actualAmount } = req.body;
     const donationId = req.params.id;
     
-    console.log('🔍 Looking for donation with ID:', donationId);
     const donation = await Donation.findByPk(donationId);
     
     if (!donation) {
-      console.log('❌ Donation not found for ID:', donationId);
       return res.status(404).json({ error: 'Donation not found' });
     }
 
-    console.log('✅ Donation found:', donation.id);
-    console.log('🔄 Updating donation with data:', { status, actualAmount });
-
     const updateData = { status };
     
+    // INSTANT Team ID generation for confirmed status
     if (status === 'confirmed') {
-      console.log('✅ Status is confirmed, processing team registration...');
+      console.log('⚡ INSTANT Team ID generation');
       
-      // Handle actual amount
-      if (actualAmount !== undefined && actualAmount !== null && actualAmount !== '') {
-        updateData.actualAmount = parseFloat(actualAmount);
-        console.log('💰 Using provided actual amount:', updateData.actualAmount);
-      } else if (!donation.actualAmount) {
-        updateData.actualAmount = parseFloat(donation.amount);
-        console.log('💰 Using donation amount as actual amount:', updateData.actualAmount);
-      } else {
-        console.log('💰 Keeping existing actual amount:', donation.actualAmount);
-      }
+      // Generate Team ID instantly (takes <1ms)
+      const teamId = generateTeamId();
+      updateData.teamId = teamId;
+      updateData.actualAmount = parseFloat(actualAmount) || parseFloat(donation.amount) || 0;
       
-      // Generate team ID if not exists
-      if (!donation.teamId) {
-        const teamId = `TEAM-${donation.id.slice(-8).toUpperCase()}`;
-        updateData.teamId = teamId;
-        console.log('🆔 Generated team ID:', teamId);
-      }
-      
-    } else {
-      console.log('❌ Status is not confirmed');
-      // Don't clear actualAmount as it might be useful for reference
+      console.log('🎯 Team ID generated:', teamId);
     }
 
-    console.log('💾 Saving update to database...');
+    // Quick database update
+    console.log('💾 Quick database update...');
     await donation.update(updateData);
-    console.log('✅ Database update successful');
+    console.log('✅ Database updated');
 
-    // Send team confirmation email if confirmed and has team ID
-    if (status === 'confirmed' && updateData.teamId) {
-      console.log('📧 Attempting to send team confirmation email...');
-      console.log('📨 Recipient email:', donation.email);
-      console.log('🆔 Team ID:', updateData.teamId);
-      
-      try {
-        const emailResult = await sendTeamConfirmationEmail(donation, updateData.teamId);
-        console.log('✅ Email function result:', emailResult);
-        
-        if (emailResult) {
-          console.log('🎉 Team confirmation email sent successfully!');
-        } else {
-          console.log('❌ Email function returned false');
-        }
-      } catch (emailError) {
-        console.error('💥 Error sending team confirmation email:', emailError);
-        console.error('Email error stack:', emailError.stack);
-      }
-    } else {
-      console.log('📧 Email not sent because:', {
-        status,
-        hasTeamId: !!(updateData.teamId)
-      });
-    }
-
-    const updatedDonation = await Donation.findByPk(req.params.id);
-    console.log('✅ Final updated donation:', updatedDonation.toJSON());
+    // Get updated donation
+    const updatedDonation = await Donation.findByPk(donationId);
     
+    // Send immediate response
     res.json({
-      message: 'Donation status updated successfully',
+      message: 'Registration status updated successfully',
       donation: updatedDonation
     });
+
+    // Background email (non-blocking)
+    if (status === 'confirmed' && updatedDonation.teamId) {
+      console.log('📧 Starting background email process...');
+      
+      // Don't wait for email - send it in background
+      sendTeamConfirmationEmail(updatedDonation, updatedDonation.teamId)
+        .then(result => {
+          if (result) {
+            console.log('✅ Background email sent successfully');
+          } else {
+            console.log('❌ Background email failed (but status was updated)');
+          }
+        })
+        .catch(emailError => {
+          console.error('💥 Background email error:', emailError.message);
+        });
+    }
     
   } catch (error) {
-    console.error('💥 Error updating donation status:', error);
-    console.error('Error stack:', error.stack);
+    console.error('❌ Error in status update:', error.message);
     res.status(500).json({ 
       error: 'Failed to update donation status',
       details: error.message 
