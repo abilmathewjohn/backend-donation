@@ -1,54 +1,35 @@
 // backend/utils/emailService.js
 const nodemailer = require('nodemailer');
 
+// Simple email function without complex setup
 const sendTeamConfirmationEmail = async (donation, teamId) => {
-  let transporter;
-  
   try {
-    console.log('📧 EMAIL ATTEMPT STARTED - Railway SMTP');
+    console.log('📧 EMAIL ATTEMPT STARTED');
     console.log('To:', donation.email);
     console.log('Team ID:', teamId);
 
-    // **RAILWAY SMTP CONFIGURATION**
-    const smtpConfig = {
-      host: process.env.SMTP_HOST || 'smtp.gmail.com',
-      port: parseInt(process.env.SMTP_PORT) || 587,
+    // Quick check for email configuration
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+      console.log('❌ EMAIL SKIPPED: No email credentials configured');
+      console.log('💡 Set EMAIL_USER and EMAIL_PASS in environment variables');
+      return false;
+    }
+
+    // Simple transporter setup
+    const transporter = nodemailer.createTransport({
+      host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+      port: process.env.EMAIL_PORT || 587,
       secure: false,
       auth: {
-        user: process.env.EMAIL_USER || "nordicpuffintechnologies@gmail.com",
+        user: process.env.EMAIL_USER ||"nordicpuffintechnologies@gmail.com",
         pass: process.env.EMAIL_PASS || "hqwikqbcivwdvjhp",
-      },
-      // **CRITICAL FOR RAILWAY**
-      tls: {
-        rejectUnauthorized: false
-      },
-      connectionTimeout: 60000, // 60 seconds
-      greetingTimeout: 60000,
-      socketTimeout: 60000
-    };
-
-    console.log('📧 Using SMTP config:', {
-      host: smtpConfig.host,
-      port: smtpConfig.port,
-      user: smtpConfig.auth.user ? smtpConfig.auth.user.substring(0, 3) + '...' : 'not set'
+      }
     });
 
-    transporter = nodemailer.createTransport(smtpConfig);
-
-    // **VERIFY CONNECTION WITH TIMEOUT**
-    console.log('🔍 Verifying SMTP connection...');
-    await Promise.race([
-      transporter.verify(),
-      new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('SMTP verification timeout')), 30000)
-      )
-    ]);
-    console.log('✅ SMTP connection verified');
-
-    const finalActualAmount = donation.actualAmount || donation.amount || 0;
+    const finalActualAmount = donation.actualAmount || donation.amount;
 
     const mailOptions = {
-      from: `"Team Registration" <${process.env.FROM_EMAIL || process.env.EMAIL_USER}>`,
+      from: `"Team Registration" <${process.env.EMAIL_USER}>`,
       to: donation.email,
       subject: `Team ${teamId} - Registration Confirmed`,
       html: `
@@ -75,28 +56,51 @@ const sendTeamConfirmationEmail = async (donation, teamId) => {
             This is an automated confirmation email.
           </p>
         </div>
+      `,
+      text: `
+TEAM REGISTRATION CONFIRMED!
+
+Dear ${donation.participantName},
+
+Your team registration has been confirmed!
+
+TEAM DETAILS:
+✅ Team ID: ${teamId}
+✅ Team Captain: ${donation.participantName}
+✅ Teammate: ${donation.teammateName}
+✅ Amount Paid: €${finalActualAmount}
+
+IMPORTANT:
+🔸 Your Team ID ${teamId} is required for event participation
+🔸 Please keep this email safe
+🔸 Contact us if you have any questions
+
+Thank you for your registration!
       `
     };
 
     console.log('📤 Sending email now...');
     const info = await transporter.sendMail(mailOptions);
-    console.log('✅ EMAIL SENT SUCCESSFULLY');
-    console.log('Message ID:', info.messageId);
+    console.log('✅ EMAIL SENT SUCCESSFULLY:', info.messageId);
+    console.log('📧 Email response:', info.response);
     
     return true;
     
   } catch (error) {
     console.error('❌ EMAIL FAILED:', error.message);
-    console.error('Error details:', {
+    console.error('Email error details:', {
       code: error.code,
       command: error.command
     });
     
-    return false;
-  } finally {
-    if (transporter) {
-      transporter.close();
+    // Check for common email errors
+    if (error.code === 'EAUTH') {
+      console.error('🔐 Authentication failed - check email credentials');
+    } else if (error.code === 'ECONNECTION') {
+      console.error('🌐 Connection failed - check network/port settings');
     }
+    
+    return false;
   }
 };
 
