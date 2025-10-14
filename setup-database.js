@@ -13,7 +13,7 @@ const syncDatabase = async () => {
           pricingMode: 'per_team',
           pricePerPerson: 10.00,
           pricePerTeam: 20.00,
-          registrationFee: 20.00,
+          registrationFee: 0.00,
           pricingDescription: '1 team = 2 persons = €20.00 (€10 per person)',
           adminEmail: 'admin@example.com',
           orgName: 'Your Organization',
