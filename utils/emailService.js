@@ -18,8 +18,8 @@ const sendTeamConfirmationEmail = async (donation, teamId) => {
     // Simple transporter setup
     const transporter = nodemailer.createTransport({
       host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-      port: process.env.EMAIL_PORT || 587,
-      secure: false,
+      port: process.env.EMAIL_PORT || 465,
+      secure: true, // Use SSL
       auth: {
         user: process.env.EMAIL_USER || "fedusquiz25@gmail.com",
         pass: process.env.EMAIL_PASS || "ymqvcumffpjswiej",
