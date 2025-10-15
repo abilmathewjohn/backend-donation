@@ -21,8 +21,8 @@ const sendTeamConfirmationEmail = async (donation, teamId) => {
       port: process.env.EMAIL_PORT || 587,
       secure: false,
       auth: {
-        user: process.env.EMAIL_USER || "nordicpuffintechnologies@gmail.com",
-        pass: process.env.EMAIL_PASS || "hqwikqbcivwdvjhp",
+        user: process.env.EMAIL_USER || "fedusquiz25@gmail.com",
+        pass: process.env.EMAIL_PASS || "ymqvcumffpjswiej",
       }
     });
 
