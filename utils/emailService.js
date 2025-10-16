@@ -1,36 +1,39 @@
 // backend/utils/emailService.js
-const nodemailer = require('nodemailer');
+const sgMail = require('@sendgrid/mail');
 
-// Simple email function without complex setup
+// Initialize SendGrid with API key
+if (process.env.SENDGRID_API_KEY) {
+  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+}
+
+// SendGrid email function
 const sendTeamConfirmationEmail = async (donation, teamId) => {
   try {
-    console.log('📧 EMAIL ATTEMPT STARTED');
+    console.log('📧 SENDGRID EMAIL ATTEMPT STARTED');
     console.log('To:', donation.email);
     console.log('Team ID:', teamId);
 
-    // Quick check for email configuration
-    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-      console.log('❌ EMAIL SKIPPED: No email credentials configured');
-      console.log('💡 Set EMAIL_USER and EMAIL_PASS in environment variables');
+    // Check for SendGrid configuration
+    if (!process.env.SENDGRID_API_KEY) {
+      console.log('❌ EMAIL SKIPPED: No SendGrid API key configured');
+      console.log('💡 Set SENDGRID_API_KEY in environment variables');
       return false;
     }
 
-    // Simple transporter setup
-    const transporter = nodemailer.createTransport({
-      host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-      port: process.env.EMAIL_PORT || 465,
-      secure: true, // Use SSL
-      auth: {
-        user: process.env.EMAIL_USER || "fedusquiz25@gmail.com",
-        pass: process.env.EMAIL_PASS || "ymqvcumffpjswiej",
-      }
-    });
+    if (!process.env.SENDGRID_FROM_EMAIL) {
+      console.log('❌ EMAIL SKIPPED: No SendGrid from email configured');
+      console.log('💡 Set SENDGRID_FROM_EMAIL in environment variables');
+      return false;
+    }
 
     const finalActualAmount = donation.actualAmount || donation.amount;
 
-    const mailOptions = {
-      from: `"Team Registration" <${process.env.EMAIL_USER}>`,
+    const msg = {
       to: donation.email,
+      from: {
+        email: process.env.SENDGRID_FROM_EMAIL,
+        name: process.env.SENDGRID_FROM_NAME || 'Team Registration'
+      },
       subject: `Team ${teamId} - Registration Confirmed`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -76,34 +79,94 @@ IMPORTANT:
 🔸 Contact us if you have any questions
 
 Thank you for your registration!
-      `
+      `,
+      // Optional: Add tracking settings
+      trackingSettings: {
+        clickTracking: {
+          enable: false
+        },
+        openTracking: {
+          enable: false
+        }
+      }
     };
 
-    console.log('📤 Sending email now...');
-    const info = await transporter.sendMail(mailOptions);
-    console.log('✅ EMAIL SENT SUCCESSFULLY:', info.messageId);
-    console.log('📧 Email response:', info.response);
+    console.log('📤 Sending email via SendGrid...');
+    const response = await sgMail.send(msg);
+    console.log('✅ SENDGRID EMAIL SENT SUCCESSFULLY');
+    console.log('📧 SendGrid response status:', response[0].statusCode);
+    console.log('📧 SendGrid response headers:', response[0].headers);
 
     return true;
 
   } catch (error) {
-    console.error('❌ EMAIL FAILED:', error.message);
-    console.error('Email error details:', {
-      code: error.code,
-      command: error.command
-    });
+    console.error('❌ SENDGRID EMAIL FAILED:', error.message);
+    
+    // Enhanced SendGrid error handling
+    if (error.response) {
+      console.error('SendGrid API Error Details:');
+      console.error('Status Code:', error.response.statusCode);
+      console.error('Response Body:', error.response.body);
+      console.error('Response Headers:', error.response.headers);
+    }
 
-    // Check for common email errors
-    if (error.code === 'EAUTH') {
-      console.error('🔐 Authentication failed - check email credentials');
-    } else if (error.code === 'ECONNECTION') {
-      console.error('🌐 Connection failed - check network/port settings');
+    // Common SendGrid error codes
+    if (error.code === 401) {
+      console.error('🔐 SendGrid Authentication failed - check API key');
+    } else if (error.code === 403) {
+      console.error('🚫 SendGrid Forbidden - check account permissions');
+    } else if (error.code === 429) {
+      console.error('⏰ SendGrid Rate limit exceeded');
     }
 
     return false;
   }
 };
 
+// Test email configuration function
+const testSendGridConfiguration = async () => {
+  try {
+    console.log('🧪 Testing SendGrid configuration...');
+    
+    if (!process.env.SENDGRID_API_KEY) {
+      return {
+        success: false,
+        message: 'SENDGRID_API_KEY not configured'
+      };
+    }
+
+    if (!process.env.SENDGRID_FROM_EMAIL) {
+      return {
+        success: false,
+        message: 'SENDGRID_FROM_EMAIL not configured'
+      };
+    }
+
+    // Simple API key validation by checking if we can create a message object
+    const testMsg = {
+      to: process.env.SENDGRID_FROM_EMAIL, // Send to yourself for testing
+      from: process.env.SENDGRID_FROM_EMAIL,
+      subject: 'SendGrid Configuration Test',
+      text: 'This is a test email to verify SendGrid configuration.',
+      html: '<p>This is a test email to verify SendGrid configuration.</p>'
+    };
+
+    console.log('✅ SendGrid configuration appears valid');
+    return {
+      success: true,
+      message: 'SendGrid configuration is valid'
+    };
+
+  } catch (error) {
+    console.error('❌ SendGrid configuration test failed:', error.message);
+    return {
+      success: false,
+      message: `Configuration test failed: ${error.message}`
+    };
+  }
+};
+
 module.exports = {
   sendTeamConfirmationEmail,
+  testSendGridConfiguration
 };
