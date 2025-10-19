@@ -11,8 +11,11 @@ if (process.env.SENDGRID_API_KEY) {
 
 /**
  * Sends a team registration confirmation email.
- * This version uses simplified HTML/CSS for maximum deliverability and avoids elements
- * that might be flagged as promotional.
+ * This function incorporates best practices for deliverability, including
+ * robust input validation, comprehensive HTML/text content, and detailed error handling.
+ *
+ * NOTE: For production use and better deliverability, consider using SendGrid Dynamic Templates
+ * instead of inline HTML strings. This also centralizes template management.
  *
  * @param {object} donation - Donation details (must contain email, participantName, amount).
  * @param {string} teamId - The unique ID for the registered team.
@@ -46,7 +49,7 @@ const sendTeamConfirmationEmail = async (donation, teamId) => {
   const fromName = process.env.SENDGRID_FROM_NAME || 'Team Registration';
   const replyTo = process.env.SENDGRID_REPLY_TO || fromEmail;
 
-  // 3. Construct Email Message
+  // 3. Construct Email Message (using both HTML and plain text is crucial for deliverability)
   const msg = {
     to: donation.email,
     from: {
@@ -54,10 +57,9 @@ const sendTeamConfirmationEmail = async (donation, teamId) => {
       name: fromName
     },
     replyTo: replyTo,
-    // REMOVED EMOJI: Simplified subject line to be purely transactional
-    subject: `Team ${teamId} Registration Confirmation`, 
+    subject: `✅ Registration Confirmed for Team ${teamId}`, // Added an emoji for visibility
     
-    // --- HTML Content (Using Tables and Inline CSS for maximum Deliverability) ---
+    // --- HTML Content ---
     html: `
       <!DOCTYPE html>
       <html lang="en">
@@ -65,80 +67,77 @@ const sendTeamConfirmationEmail = async (donation, teamId) => {
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Registration Confirmed</title>
+        <style>
+          /* Reset Styles */
+          body, html { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif; background: #f4f4f4; color: #333; }
+          .container { max-width: 600px; margin: 20px auto; background: white; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.05); overflow: hidden; }
+          .header { background-color: #0066cc; color: white; padding: 30px 20px; text-align: center; }
+          .content { padding: 20px 30px; }
+          h1 { font-size: 28px; margin: 0; font-weight: 600; }
+          p { font-size: 16px; line-height: 1.6; margin: 0 0 16px; }
+          .card { background: #f8fafc; border: 1px solid #e2e8f0; padding: 16px; border-radius: 6px; margin: 20px 0; }
+          .highlight { color: #0066cc; font-weight: 700; font-size: 18px; }
+          .detail-row { display: block; margin-bottom: 8px; }
+          .detail-row strong { display: inline-block; width: 120px; color: #1a1a1a; }
+          .footer { text-align: center; padding: 20px 30px; color: #6b7280; font-size: 12px; border-top: 1px solid #e2e8f0; }
+          
+          /* Responsive adjustments (basic) */
+          @media screen and (max-width: 600px) {
+            .container { margin: 0; border-radius: 0; box-shadow: none; }
+            .content { padding: 15px; }
+            h1 { font-size: 24px; }
+            .detail-row strong { width: 100%; display: block; margin-bottom: 4px; }
+          }
+        </style>
       </head>
-      <!-- Body styles are inline and use widely supported fonts -->
-      <body style="margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; background-color: #f4f4f4; color: #333; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%;">
-        <!-- Center the entire email container -->
-        <center>
-        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; background-color: white; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.05); margin: 20px auto;">
-          
-          <!-- Header (Simplified - removing aggressive color) -->
-          <tr>
-            <td align="center" style="background-color: #EEEEEE; color: #1a1a1a; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
-              <h1 style="font-size: 24px; margin: 0; font-weight: 600;">Team Registration Confirmed</h1>
-            </td>
-          </tr>
-          
-          <!-- Content Body -->
-          <tr>
-            <td style="padding: 20px 30px;">
-              <p style="font-size: 16px; line-height: 1.6; margin-bottom: 16px; color: #333;">Dear ${donation.participantName},</p>
-              <p style="font-size: 16px; line-height: 1.6; margin-bottom: 24px; color: #333;">Thank you for registering! Your team is officially confirmed and your **transaction is complete**. Below are your registration details:</p>
-              
-              <!-- Details Table (Card replacement) -->
-              <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; margin: 20px 0;">
-                <tr>
-                  <td style="padding: 15px;">
-                    <!-- Detail Row 1: Team ID -->
-                    <p style="margin: 0 0 8px; font-size: 16px;">
-                      <strong style="color: #1a1a1a; display: inline-block; min-width: 120px;">Team ID:</strong> 
-                      <span style="color: #0066cc; font-weight: 700; font-size: 16px;">${teamId}</span>
-                    </p>
-                    <!-- Detail Row 2: Captain -->
-                    <p style="margin: 0 0 8px; font-size: 16px;">
-                      <strong style="color: #1a1a1a; display: inline-block; min-width: 120px;">Captain:</strong> 
-                      ${donation.participantName}
-                    </p>
-                    <!-- Detail Row 3: Teammate -->
-                    <p style="margin: 0 0 8px; font-size: 16px;">
-                      <strong style="color: #1a1a1a; display: inline-block; min-width: 120px;">Teammate:</strong> 
-                      ${donation.teammateName || 'N/A'}
-                    </p>
-                    <!-- Detail Row 4: Amount Paid -->
-                    <p style="margin: 0; font-size: 16px;">
-                      <strong style="color: #1a1a1a; display: inline-block; min-width: 120px;">Amount Paid:</strong> 
-                      €${finalActualAmount}
-                    </p>
-                  </td>
-                </tr>
-              </table>
-              <!-- End Details Table -->
-              
-              <p style="font-size: 16px; line-height: 1.6; margin-bottom: 16px; color: #333;">This **Team ID** is required for all event-related communication and participation. Please keep it safe.</p>
-              <p style="font-size: 16px; line-height: 1.6; margin-bottom: 0; color: #333;">For any questions, please simply reply to this email, and our support team will assist you promptly.</p>
-            </td>
-          </tr>
-          
-          <!-- Footer -->
-          <tr>
-            <td align="center" style="text-align: center; padding: 20px 30px; color: #6b7280; font-size: 12px; border-top: 1px solid #e2e8f0; border-radius: 0 0 8px 8px;">
-              <p style="margin: 0 0 5px;">This is an automated transaction confirmation from ${fromName}.</p>
-              <a href="mailto:${replyTo}" style="color: #6b7280; text-decoration: underline;">Contact Support</a>
-            </td>
-          </tr>
-        </table>
-        </center>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>Team Registration Confirmed</h1>
+          </div>
+          <div class="content">
+            <p>Dear ${donation.participantName},</p>
+            <p>Thank you for registering! Your team is officially confirmed for the event. Below are your registration details:</p>
+            
+            <div class="card">
+              <span class="detail-row">
+                <strong>Team ID:</strong>
+                <span class="highlight">${teamId}</span>
+              </span>
+              <span class="detail-row">
+                <strong>Captain:</strong>
+                ${donation.participantName}
+              </span>
+              <span class="detail-row">
+                <strong>Teammate:</strong>
+                ${donation.teammateName || 'N/A'}
+              </span>
+              <span class="detail-row">
+                <strong>Amount Paid:</strong>
+                €${finalActualAmount}
+              </span>
+            </div>
+            
+            <p>This Team ID is your official reference for all event-related communication and participation.</p>
+            <p>We look forward to seeing you there! If you have any questions, please simply reply to this email.</p>
+          </div>
+          <div class="footer">
+            <p>This is an automated transaction confirmation email from ${fromName}.</p>
+            <p>If you did not initiate this registration, please contact us immediately.</p>
+            <p><a href="mailto:${replyTo}" style="color: #6b7280; text-decoration: underline;">Contact Support</a></p>
+          </div>
+        </div>
       </body>
       </html>
     `,
     
-    // --- Plain Text Content (Cleaned up for maximum spam filter safety) ---
+    // --- Plain Text Content (MANDATORY for spam prevention) ---
     text: `
-Team Registration Confirmation
+Team Registration Confirmed
 
 Dear ${donation.participantName},
 
-Your team registration is complete! This is a transaction confirmation.
+Your team registration is complete!
 
 --- Team Details ---
 - Team ID: ${teamId}
@@ -147,7 +146,7 @@ Your team registration is complete! This is a transaction confirmation.
 - Amount Paid: €${finalActualAmount}
 ----------------------
 
-Please keep your Team ID safe as it is required for event participation.
+Please keep your Team ID safe as it's required for event participation.
 For any questions, reply to this email (${replyTo}) or contact our support team.
 
 Thank you for registering!
