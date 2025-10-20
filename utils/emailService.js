@@ -11,8 +11,9 @@ if (process.env.SENDGRID_API_KEY) {
 
 /**
  * Sends a team registration confirmation email.
- * This version uses simplified HTML/CSS for maximum deliverability and avoids elements
- * that might be flagged as promotional.
+ * NOTE: For best deliverability, ensure SENDGRID_FROM_EMAIL uses a custom domain
+ * (e.g., info@stalphonsamalta.com) that has been fully authenticated (SPF/DKIM)
+ * in the SendGrid dashboard.
  *
  * @param {object} donation - Donation details (must contain email, participantName, amount).
  * @param {string} teamId - The unique ID for the registered team.
@@ -41,8 +42,12 @@ const sendTeamConfirmationEmail = async (donation, teamId) => {
     };
   }
 
-  const finalActualAmount = donation.actualAmount || donation.amount || 0;
   const fromEmail = process.env.SENDGRID_FROM_EMAIL;
+  
+  // NOTE: The previous check for public domains has been removed. 
+  // Please ensure SENDGRID_FROM_EMAIL is set to an address on your authenticated domain (stalphonsamalta.com)
+  
+  const finalActualAmount = donation.actualAmount || donation.amount || 0;
   const fromName = process.env.SENDGRID_FROM_NAME || 'Team Registration';
   const replyTo = process.env.SENDGRID_REPLY_TO || fromEmail;
 
@@ -54,8 +59,8 @@ const sendTeamConfirmationEmail = async (donation, teamId) => {
       name: fromName
     },
     replyTo: replyTo,
-    // REMOVED EMOJI: Simplified subject line to be purely transactional
-    subject: `Team ${teamId} Registration Confirmation`, 
+    // ADJUSTMENT: Changed subject format to be more clearly transactional, which can sometimes bypass final content filters.
+    subject: `Confirmation: Your Team Registration is Complete (ID: ${teamId})`, 
     
     // --- HTML Content (Using Tables and Inline CSS for maximum Deliverability) ---
     html: `
@@ -72,7 +77,7 @@ const sendTeamConfirmationEmail = async (donation, teamId) => {
         <center>
         <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; background-color: white; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.05); margin: 20px auto;">
           
-          <!-- Header (Simplified - removing aggressive color) -->
+          <!-- Header (Simplified) -->
           <tr>
             <td align="center" style="background-color: #EEEEEE; color: #1a1a1a; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
               <h1 style="font-size: 24px; margin: 0; font-weight: 600;">Team Registration Confirmed</h1>
