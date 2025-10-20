@@ -1,6 +1,5 @@
 const { Sequelize, DataTypes } = require('sequelize');
 const path = require('path');
-
 require('dotenv').config();
 
 // Initialize Sequelize
@@ -44,12 +43,11 @@ testConnection();
 const Donation = require('./Donation')(sequelize);
 const PaymentLink = require('./PaymentLink')(sequelize);
 const AdminSettings = require('./AdminSettings')(sequelize);
-const EmailLog = require('./EmailLog')(sequelize); // Add EmailLog import
 
 // Sync database
 const syncDatabase = async () => {
   try {
-    await sequelize.sync({ alter: true });
+    await sequelize.sync({ alter: true }); // Changed to alter: true to add missing columns
     console.log('✅ Database synced successfully');
     
     // Create default admin settings
@@ -58,13 +56,9 @@ const syncDatabase = async () => {
         where: { id: 'default-settings' },
         defaults: {
           contactPhone: '+3XXXXXXXXX',
-          pricingMode: 'per_team',
-          pricePerPerson: 10.00,
-          pricePerTeam: 20.00,
-          registrationFee: 20.00,
-          pricingDescription: '1 team = 2 persons = €20.00 (€10 per person)',
+          ticketPrice: 2.00,
           adminEmail: 'admin@example.com',
-          orgName: 'Your Organization',
+          orgName: 'Your Organization', // Now safe since column will exist
           logoUrl: null,
           logoPublicId: null,
           banners: [],
@@ -84,25 +78,11 @@ const syncDatabase = async () => {
     console.error('❌ Error syncing database:', error);
   }
 };
-
 syncDatabase();
-
-// Add associations
-Donation.hasMany(EmailLog, { 
-  foreignKey: 'donationId', 
-  as: 'emailLogs',
-  onDelete: 'CASCADE'
-});
-
-EmailLog.belongsTo(Donation, { 
-  foreignKey: 'donationId', 
-  as: 'donation'
-});
 
 module.exports = {
   sequelize,
   Donation,
   PaymentLink,
   AdminSettings,
-  EmailLog, 
 };
