@@ -1,5 +1,7 @@
 const { Sequelize, DataTypes } = require('sequelize');
 const path = require('path');
+const EmailLog = require('./EmailLog')(sequelize);
+
 require('dotenv').config();
 
 // Initialize Sequelize
@@ -80,9 +82,14 @@ const syncDatabase = async () => {
 };
 syncDatabase();
 
+// Add associations
+Donation.hasMany(EmailLog, { foreignKey: 'donationId', as: 'emailLogs' });
+EmailLog.belongsTo(Donation, { foreignKey: 'donationId', as: 'donation' });
+
 module.exports = {
   sequelize,
   Donation,
   PaymentLink,
   AdminSettings,
+  EmailLog,
 };
