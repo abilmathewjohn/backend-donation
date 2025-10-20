@@ -1,4 +1,3 @@
-
 const { DataTypes } = require('sequelize');
 
 module.exports = (sequelize) => {
@@ -23,6 +22,9 @@ module.exports = (sequelize) => {
     recipientEmail: {
       type: DataTypes.STRING,
       allowNull: false,
+      validate: {
+        isEmail: true
+      }
     },
     recipientName: {
       type: DataTypes.STRING,
@@ -47,6 +49,23 @@ module.exports = (sequelize) => {
   }, {
     tableName: 'EmailLogs',
     timestamps: true,
+    indexes: [
+      {
+        fields: ['donationId']
+      },
+      {
+        fields: ['teamId']
+      },
+      {
+        fields: ['recipientEmail']
+      },
+      {
+        fields: ['status']
+      },
+      {
+        fields: ['sentAt']
+      }
+    ]
   });
 
   return EmailLog;
