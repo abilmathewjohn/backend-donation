@@ -8,6 +8,7 @@ const helmet = require('helmet');
 require('dotenv').config();
 var indexRouter = require('./routes/index');
 var usersRouter = require('./routes/users');
+const emailRoutes = require('./routes/emailManagement');
 
 var app = express();
 app.use(helmet());
@@ -30,6 +31,8 @@ app.use('/users', usersRouter);
 app.use('/api/donations', require('./routes/donations'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/payment-links', require('./routes/payment-links'));
+app.use('/api/admin', emailRoutes);
+
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {
