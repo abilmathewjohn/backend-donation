@@ -4,8 +4,9 @@ const { EmailLog } = require('../models');
 // Initialize SendGrid
 if (process.env.SENDGRID_API_KEY) {
   sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+  console.log('✅ SendGrid initialized successfully');
 } else {
-  console.warn("SENDGRID_API_KEY is not set. Email functionality will be disabled.");
+  console.warn("⚠️ SENDGRID_API_KEY is not set. Email functionality will be disabled.");
 }
 
 /**
@@ -56,10 +57,10 @@ const sendTeamConfirmationEmail = async (donation, teamId) => {
       subject: `✅ Team Registration Confirmed - Team ID: ${teamId}`,
       
       // HTML Content with modern styling
-      html: buildEmailHTML(donation, teamId, finalActualAmount, fromName),
+      html: buildEmailHTML(donation, teamId, finalActualAmount, fromName, replyTo),
       
       // Plain Text Content (important for deliverability)
-      text: buildEmailText(donation, teamId, finalActualAmount, fromName),
+      text: buildEmailText(donation, teamId, finalActualAmount, fromName, replyTo),
       
       // Email tracking settings
       trackingSettings: {
@@ -126,7 +127,7 @@ const sendTeamConfirmationEmail = async (donation, teamId) => {
 /**
  * Builds HTML email content
  */
-const buildEmailHTML = (donation, teamId, amount, fromName) => {
+const buildEmailHTML = (donation, teamId, amount, fromName, replyTo) => {
   return `
 <!DOCTYPE html>
 <html lang="en">
@@ -264,7 +265,7 @@ const buildEmailHTML = (donation, teamId, amount, fromName) => {
 /**
  * Builds plain text email content
  */
-const buildEmailText = (donation, teamId, amount, fromName) => {
+const buildEmailText = (donation, teamId, amount, fromName, replyTo) => {
   return `
 TEAM REGISTRATION CONFIRMED
 
@@ -288,7 +289,7 @@ Registration Date: ${new Date().toLocaleDateString()}
 4. Arrive 30 minutes early on event day
 
 === CONTACT INFORMATION ===
-If you have any questions, please reply to this email or contact our support team.
+If you have any questions, please reply to this email or contact our support team at ${replyTo}.
 
 We look forward to seeing you at the event!
 
@@ -351,12 +352,12 @@ const sendCustomEmail = async (to, subject, htmlContent, textContent = null) => 
 
     const response = await sgMail.send(msg);
     
-    // Log custom email (you might want to create a separate log for custom emails)
+    // Log custom email
     await EmailLog.create({
-      donationId: null, // Custom emails might not be associated with a donation
+      donationId: null,
       teamId: 'CUSTOM',
       recipientEmail: to,
-      recipientName: to, // You might want to capture name separately
+      recipientName: to.split('@')[0],
       subject: subject,
       status: 'sent',
       sentAt: new Date()
@@ -375,7 +376,7 @@ const sendCustomEmail = async (to, subject, htmlContent, textContent = null) => 
       donationId: null,
       teamId: 'CUSTOM',
       recipientEmail: to,
-      recipientName: to,
+      recipientName: to.split('@')[0],
       subject: subject,
       status: 'failed',
       errorMessage: error.message,
@@ -390,39 +391,6 @@ const sendCustomEmail = async (to, subject, htmlContent, textContent = null) => 
 };
 
 /**
- * Bulk email sending for multiple teams
- */
-const sendBulkConfirmations = async (donations) => {
-  const results = [];
-  
-  for (const donation of donations) {
-    if (donation.status === 'confirmed' && donation.teamId) {
-      try {
-        const result = await sendTeamConfirmationEmail(donation, donation.teamId);
-        results.push({
-          teamId: donation.teamId,
-          email: donation.email,
-          success: result.success,
-          message: result.message
-        });
-        
-        // Small delay to avoid rate limiting
-        await new Promise(resolve => setTimeout(resolve, 100));
-      } catch (error) {
-        results.push({
-          teamId: donation.teamId,
-          email: donation.email,
-          success: false,
-          message: error.message
-        });
-      }
-    }
-  }
-  
-  return results;
-};
-
-/**
  * Test email configuration
  */
 const testEmailConfig = async (testEmail = null) => {
@@ -430,6 +398,13 @@ const testEmailConfig = async (testEmail = null) => {
     const fromEmail = process.env.SENDGRID_FROM_EMAIL;
     const fromName = process.env.SENDGRID_FROM_NAME || 'Team Registration System';
     const testTo = testEmail || fromEmail;
+
+    if (!fromEmail) {
+      return {
+        success: false,
+        message: 'SENDGRID_FROM_EMAIL not configured in environment variables'
+      };
+    }
 
     const testMsg = {
       to: testTo,
@@ -480,6 +455,5 @@ const testEmailConfig = async (testEmail = null) => {
 module.exports = {
   sendTeamConfirmationEmail,
   sendCustomEmail,
-  sendBulkConfirmations,
   testEmailConfig
 };
